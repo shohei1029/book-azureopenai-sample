@@ -1,0 +1,63 @@
+openapi: 3.0.1
+info:
+  title: Cafe Review Plugin
+  description: A plugin that allows the user to create and manage a Cafe user Review list using ChatGPT. If you do not know the user's username, ask them first before making queries to the plugin. Otherwise, use the username "global".
+  version: 'v1'
+servers:
+  - url: http://localhost:5005
+paths:
+  /reviews/{username}:
+    get:
+      operationId: getReviews
+      summary: Get the list of user reviews
+      parameters:
+      - in: path
+        name: username
+        schema:
+            type: string
+        required: true
+        description: The name of the user.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/getReviewsResponse'
+
+  /search:
+    get:
+      operationId: searchCafe
+      summary: Search for information on cafes
+      parameters:
+      - in: query
+        name: q
+        schema:
+            type: string
+        required: true
+        description: The name of the cafe.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/searchCafeResponse'
+components:
+  schemas:
+    getReviewsResponse:
+      type: object
+      properties:
+        todos:
+          type: array
+          items:
+            type: string
+          description: The list of reviews.
+    searchCafeResponse:
+      type: object
+      properties:
+        todos:
+          type: array
+          items:
+            type: string
+          description: The list of reviews.
