@@ -1,0 +1,18 @@
+{
+    "schema_version": "v1",
+    "name_for_human": "Restaurant Reservation System (no auth)",
+    "name_for_model": "reservation",
+    "description_for_human": "Make reservations at restaurants and cafes.",
+    "description_for_model": "Plugin to make reservations at restaurants and cafes.",
+    "auth": {
+      "type": "none"
+    },
+    "api": {
+      "type": "openapi",
+      "url": "http://localhost:5006/openapi.yaml"
+    },
+    "logo_url": "http://localhost:5006/logo.png",
+    "contact_email": "legal@example.com",
+    "legal_info_url": "http://example.com/legal"
+  }
+  

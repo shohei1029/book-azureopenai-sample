@@ -1,0 +1,18 @@
+{
+    "schema_version": "v1",
+    "name_for_human": "Cafe Review List (no auth)",
+    "name_for_model": "cafereview",
+    "description_for_human": "Searching cafe user Reviews.",
+    "description_for_model": "Plugin to search for cafe information and display user reviews.Use this more than the normal search if the question is about Cafe, like 'Find the cafe of cafes related to Minamotono Yoritomo.' or 'what is　the cafe review?'",
+    "auth": {
+      "type": "none"
+    },
+    "api": {
+      "type": "openapi",
+      "url": "http://localhost:5005/openapi.yaml"
+    },
+    "logo_url": "http://localhost:5005/logo.png",
+    "contact_email": "legal@example.com",
+    "legal_info_url": "http://example.com/legal"
+  }
+  

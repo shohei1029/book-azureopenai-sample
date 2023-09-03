@@ -1,0 +1,76 @@
+openapi: 3.0.1
+info:
+  title: Restaurant Reservation Plugin
+  description: Plugin to make reservations at restaurants and cafes. If you do not know the restaurantsname and datetime ask them first before making queries to the plugin.
+  version: 'v1'
+servers:
+  - url: http://localhost:5006
+paths:
+  /reserve:
+    post:
+      operationId: reserveRestaurant
+      summary: reserve restaurant
+      parameters:
+      - in: query
+        name: q
+        schema:
+            type: string
+        required: true
+        description: The name of the restaurant.
+      - in: query
+        name: datetime
+        schema:
+            type: string
+        required: true
+        description: The value of the datetime.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/reserveRestaurant'
+      responses:
+        "200":
+          description: OK
+  /search:
+    get:
+      operationId: searchReservations
+      summary: Search restaurant reservations
+      parameters:
+      - in: query
+        name: q
+        schema:
+            type: string
+        required: true
+        description: The name of the restaurant.
+      - in: query
+        name: datetime
+        schema:
+            type: string
+        required: true
+        description: The value of the datetime.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/searchCafeResponse'
+components:
+  schemas:
+    searchCafeResponse:
+      type: object
+      properties:
+        todos:
+          type: array
+          items:
+            type: string
+          description: The list of reviews.
+    reserveRestaurant:
+      type: object
+      properties:
+        todos:
+          type: array
+          items:
+            type: string
+          description: The list of reviews.
