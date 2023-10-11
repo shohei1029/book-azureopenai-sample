@@ -19,7 +19,7 @@ param searchServiceName string = ''
 param searchServiceResourceGroupName string = ''
 param searchServiceResourceGroupLocation string = location
 
-param searchServiceSkuName string = 'standard'
+param searchServiceSkuName string = 'basic'
 param searchIndexName string // Set in main.parameters.json
 
 param storageAccountName string = ''
