@@ -8,7 +8,6 @@
   - [コスト見積もり](#コスト見積もり)
   - [前提条件](#前提条件)
     - [ローカルで実行する場合](#ローカルで実行する場合)
-    - [GitHub Codespaces または VS Code Remote Containers で実行する場合](#github-codespaces-または-vs-code-remote-containers-で実行する場合)
   - [新規でデプロイする](#新規でデプロイする)
   - [既存のリソースでのデプロイ](#既存のリソースでのデプロイ)
   - [再デプロイ](#再デプロイ)
@@ -18,6 +17,7 @@
 - [オプション機能の有効化](#オプション機能の有効化)
   - [Application Insights の有効化](#application-insights-の有効化)
   - [認証の有効化](#認証の有効化)
+- [GitHub Codespaces または VS Code Remote Containers で実行する場合](#github-codespaces-または-vs-code-remote-containers-で実行する場合)
 - [Resources](#resources)
   - [FAQ](#faq)
   - [トラブルシューティング](#トラブルシューティング)
@@ -167,7 +167,7 @@ Application Insights と各リクエストのトレース、エラーのログ�
 
 その後、特定のユーザーまたはグループへのアクセスを制限するには、[Azure AD アプリを Azure AD テナントの一連のユーザーに制限する](https://learn.microsoft.com/azure/active-directory/develop/howto-restrict-your-app-to-a-set-of-users) の手順に従って、Enterprise Application の下の "Assignment Required?" オプションを変更し、ユーザー/グループへのアクセスを割り当てます。 明示的にアクセス権が付与されていないユーザーには、「AADSTS50105: Your administrator has configured the application <app_name> to block users unless they are specifically granted ('assigned') access to the application.」というエラーメッセージが表示されます。
 
-#### GitHub Codespaces または VS Code Remote Containers で実行する場合
+### GitHub Codespaces または VS Code Remote Containers で実行する場合
 
 GitHub Codespaces または VS Code Remote Containers を使えば、このレポジトリを仮想的に実行できます。以下のボタンのいずれかをクリックして、これらのオプションのいずれかでこのレポジトリを開いてください。
 
