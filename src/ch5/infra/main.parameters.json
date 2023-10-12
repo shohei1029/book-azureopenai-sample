@@ -1,0 +1,28 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "environmentName": {
+      "value": "${AZURE_ENV_NAME}"
+    },
+    "location": {
+      "value": "${AZURE_LOCATION}"
+    },
+
+    "corsOriginUrl": {
+      "value": "*"
+    },
+    "audienceAppId": {
+      "value": "98557e77-c31d-4a84-94b7-e5b6acfe7acb"
+    },
+    "scopeName": {
+      "value": "chat"
+    },
+    "tenantId": {
+      "value": "d9bb6c23-396f-4f07-a433-3c6872c187c5"
+    },
+    "aoaiCapacity": {
+      "value": 30
+    }
+  }
+}
