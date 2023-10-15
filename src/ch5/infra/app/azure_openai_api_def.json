@@ -37,7 +37,7 @@
             "required": true,
             "schema": {
               "type": "string",
-              "example": "davinci",
+              "example": "chatgpt",
               "description": "Deployment id of the model which was deployed."
             }
           },
@@ -302,7 +302,7 @@
                   ]
                 },
                 "example": {
-                  "model": "davinci",
+                  "model": "chatgpt",
                   "object": "text_completion",
                   "id": "cmpl-4509KAos68kxOqpE2uYGw81j6m7uo",
                   "created": 1637097562,
@@ -358,7 +358,7 @@
             "required": true,
             "schema": {
               "type": "string",
-              "example": "ada-search-index-v1"
+              "example": "ada"
             },
             "description": "The deployment id of the model which was deployed."
           },
@@ -505,6 +505,7 @@
             "required": true,
             "schema": {
               "type": "string",
+              "example": "chatgpt",
               "description": "Deployment id of the model which was deployed."
             }
           },

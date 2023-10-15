@@ -8,18 +8,21 @@
     "location": {
       "value": "${AZURE_LOCATION}"
     },
+    "aoaiSecondLocation": {
+      "value": "eastus"
+    },
 
     "corsOriginUrl": {
       "value": "*"
     },
     "audienceAppId": {
-      "value": "98557e77-c31d-4a84-94b7-e5b6acfe7acb"
+      "value": "abcd1234-abcd-1234-abcd-1234abcd1234"
     },
     "scopeName": {
       "value": "chat"
     },
     "tenantId": {
-      "value": "d9bb6c23-396f-4f07-a433-3c6872c187c5"
+      "value": "abcd1234-abcd-1234-abcd-1234abcd1234"
     },
     "aoaiCapacity": {
       "value": 30

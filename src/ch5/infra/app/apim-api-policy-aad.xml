@@ -46,6 +46,7 @@
         </trace>
         <quota-by-key calls="300" renewal-period="86400" counter-key="@(((Jwt)context.Variables["jwt-variables"]).Claims.GetValueOrDefault("preferred_username"))" increment-condition="@(context.Response.StatusCode >= 200 && context.Response.StatusCode < 300)" />
         <authentication-managed-identity resource="https://cognitiveservices.azure.com" />
+        <authentication-certificate thumbprint="3327C4FDC61DF4C8769DEC0A6B6E54A7AE196B8D" />
     </inbound>
     <backend>
         <base />
