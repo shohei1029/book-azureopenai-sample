@@ -32,12 +32,19 @@ param aoaiCapacity int = 10
 
 // Please provide these parameters if you need to create a new Azure OpenAI resource
 param openAiSkuName string = 'S0'
-param gptDeploymentName string = 'davinci'
-param gptModelName string = 'gpt-35-turbo'
+param adaDeploymentName string = 'ada'
+param adaModelName string = 'text-embedding-ada-002'
 param chatGptDeploymentName string = 'chatgpt'
 param chatGptModelName string = 'gpt-35-turbo'
 
+param vnetAddressPrefix string = '10.0.0.0/16'
+
+param subnetAddressPrefix1 string = '10.0.0.0/24'
+param subnetAddressPrefix2 string = '10.0.1.0/24'
+
 // params for api policy settings
+@description('2つめのAzire OpenAIのリージョンを指定してください')
+param aoaiSecondLocation string = 'xxxx'
 @description('CORSオリジンとして許可するドメインを指定してください(*でも可)')
 param corsOriginUrl string = '*'
 @description('認可対象となるAzure ADに登録されたアプリのIDを指定してください（例: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx）')
@@ -48,8 +55,8 @@ param scopeName string = 'chat'
 param tenantId string = 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
 
 var abbrs = loadJsonContent('./abbreviations.json')
-//var resourceToken = toLower(uniqueString(subscription().id, environmentName, location))
-var resourceToken = 'ytatewaki091607'
+var resourceToken = toLower(uniqueString(subscription().id, environmentName, location))
+//var resourceToken = 'ytatewaki101502'
 var tags = { 'azd-env-name': environmentName }
 
 // Organize resources in a resource group
@@ -64,11 +71,11 @@ resource openAiResourceGroup 'Microsoft.Resources/resourceGroups@2021-04-01' exi
   name: !empty(openAiResourceGroupName) ? openAiResourceGroupName : rg.name
 }
 
-module openAi 'core/ai/cognitiveservices.bicep' = {
-  name: 'openai'
+module openAi1 'core/ai/cognitiveservices.bicep' = {
+  name: 'openai1'
   scope: openAiResourceGroup
   params: {
-    name: !empty(openAiServiceName) ? openAiServiceName : '${abbrs.cognitiveServicesAccounts}${resourceToken}'
+    name: !empty(openAiServiceName) ? openAiServiceName : '${abbrs.cognitiveServicesAccounts}${resourceToken}-1'
     location: openAiResourceGroupLocation
     tags: tags
     sku: {
@@ -77,11 +84,11 @@ module openAi 'core/ai/cognitiveservices.bicep' = {
     }
     deployments: [
       {
-        name: gptDeploymentName
+        name: adaDeploymentName
         model: {
           format: 'OpenAI'
-          name: gptModelName
-          version: '0613'
+          name: adaModelName
+          version: '2'
         }
         sku: {
           name: 'Standard'
@@ -104,6 +111,48 @@ module openAi 'core/ai/cognitiveservices.bicep' = {
     ]
   }
 }
+
+module openAi2 'core/ai/cognitiveservices.bicep' = {
+  name: 'openai2'
+  scope: openAiResourceGroup
+  params: {
+    name: !empty(openAiServiceName) ? openAiServiceName : '${abbrs.cognitiveServicesAccounts}${resourceToken}-2'
+    location: aoaiSecondLocation
+    tags: tags
+    sku: {
+      name: openAiSkuName
+      capacity: aoaiCapacity
+    }
+    deployments: [
+      {
+        name: adaDeploymentName
+        model: {
+          format: 'OpenAI'
+          name: adaModelName
+          version: '2'
+        }
+        sku: {
+          name: 'Standard'
+          capacity: aoaiCapacity
+        }
+      }
+
+      {
+        name: chatGptDeploymentName
+        model: {
+          format: 'OpenAI'
+          name: chatGptModelName
+          version: '0613'
+        }
+        sku: {
+          name: 'Standard'
+          capacity: aoaiCapacity
+        }
+      }
+    ]
+  }
+}
+
 
 // Storage Account
 module storage 'core/storage/storage-account.bicep' = {
@@ -129,6 +178,130 @@ module storage 'core/storage/storage-account.bicep' = {
     ]
   }
 }
+
+// ================================================================================================
+// NETWORK
+// ================================================================================================
+module publicIP 'core/network/pip.bicep' = {
+  name: '${abbrs.networkPublicIPAddresses}${resourceToken}'
+  scope: rg
+  params: {
+    name: '${abbrs.networkPublicIPAddresses}${resourceToken}'
+    location: location
+    domainNameLabel: '${abbrs.networkApplicationGateways}${resourceToken}'
+  }
+}
+
+module vnet 'core/network/vnet.bicep' = {
+  name: '${abbrs.networkVirtualNetworks}${resourceToken}'
+  scope: rg
+  params: {
+    name: '${abbrs.networkVirtualNetworks}${resourceToken}'
+    location: location
+    addressPrefixes: [vnetAddressPrefix]
+  }
+}
+
+module nsgPublic 'core/network/nsgPublic.bicep' = {
+  name: '${abbrs.networkNetworkSecurityGroups}public-${resourceToken}'
+  scope: rg
+  params: {
+    name: '${abbrs.networkNetworkSecurityGroups}public-${resourceToken}'
+    location: location
+  }
+}
+
+module nsgPrivate 'core/network/nsgPrivate.bicep' = {
+  name: '${abbrs.networkNetworkSecurityGroups}private-${resourceToken}'
+  scope: rg
+  params: {
+    name: '${abbrs.networkNetworkSecurityGroups}private-${resourceToken}'
+    location: location
+  }
+}
+
+module PublicSubnet 'core/network/subnet.bicep' = {
+  name: '${abbrs.networkVirtualNetworksSubnets}public-${resourceToken}'
+  scope: rg
+  params: {
+    existVnetName: vnet.outputs.name
+    name: '${abbrs.networkVirtualNetworksSubnets}public-${resourceToken}'
+    addressPrefix: subnetAddressPrefix1
+    networkSecurityGroup: {
+      id: nsgPublic.outputs.id
+    }
+  }
+  dependsOn: [
+    vnet
+  ]
+}
+
+module PrivateSubnet 'core/network/subnet.bicep' = {
+  name: '${abbrs.networkVirtualNetworksSubnets}private-${resourceToken}'
+  scope: rg
+  params: {
+    existVnetName: vnet.outputs.name
+    name: '${abbrs.networkVirtualNetworksSubnets}private-${resourceToken}'
+    addressPrefix: subnetAddressPrefix2
+    networkSecurityGroup: {
+      id: nsgPrivate.outputs.id
+    }
+  }
+  dependsOn: [
+    vnet
+    PublicSubnet
+  ]
+}
+
+// ================================================================================================
+// PRIVATE ENDPOINT
+// ================================================================================================
+module oepnaiPrivateEndopoint 'core/network/privateEndpoint.bicep' = {
+  name: '${abbrs.networkPrivateLinkServices}${resourceToken}'
+  scope: rg
+  params: {
+    location: location
+    name: '${abbrs.networkPrivateLinkServices}${resourceToken}'
+    subnetId: PrivateSubnet.outputs.id
+    privateLinkServiceIdopenAi1: openAi1.outputs.id
+    privateLinkServiceIdopenAi2: openAi2.outputs.id
+    privateLinkServiceGroupIds: ['account']
+    dnsZoneName: 'openai.azure.com'
+    linkVnetId: vnet.outputs.id
+  }
+  dependsOn: [
+    vnet
+    PrivateSubnet
+    openAi1
+    openAi2
+  ]
+}
+
+
+
+// ================================================================================================
+// APPLICATION GATEWAY
+// ================================================================================================
+module agw './core/gateway/agw.bicep' = {
+  name: '${abbrs.networkApplicationGateways}${resourceToken}'
+  scope: rg
+  params: {
+    VnetName: vnet.outputs.name
+    SnetName: PublicSubnet.outputs.name
+    location: location
+    name: '${abbrs.networkApplicationGateways}${resourceToken}'
+    publicIPName: publicIP.outputs.name
+    OpenaiName: '${abbrs.cognitiveServicesAccounts}${resourceToken}'
+
+  }
+  dependsOn: [
+    vnet
+    PublicSubnet
+    publicIP
+    oepnaiPrivateEndopoint
+  ]
+}
+
 
 // Monitor application with Azure Monitor
 module monitoring './core/monitor/monitoring.bicep' = {
@@ -180,6 +353,7 @@ module apimApi './app/apim-api.bicep' = {
   scope: rg
   dependsOn: [
     apim
+    agw
   ]
   params: {
     name: apim.outputs.apimServiceName
@@ -192,13 +366,10 @@ module apimApi './app/apim-api.bicep' = {
     corsOriginUrl: corsOriginUrl
     audienceAppId: audienceAppId
     scopeName: scopeName
-    apiBackendUrl: 'https://${openAi.outputs.name}.openai.azure.com/openai'
+    apiBackendUrl: 'https://${abbrs.networkApplicationGateways}${resourceToken}.${location}.cloudapp.azure.com/openai'
     tenantId: tenantId
   }
 }
-// next action
-// 1.ポリシーを簡略化する
-// 2.VNet統合する
 
 // App outputs
 output APPLICATIONINSIGHTS_CONNECTION_STRING string = monitoring.outputs.applicationInsightsConnectionString
