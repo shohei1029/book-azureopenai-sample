@@ -1,9 +1,10 @@
 import json
+import logging
 
+import openai
 import quart
 import quart_cors
 from quart import request
-import openai
 
 app = quart_cors.cors(quart.Quart(__name__), allow_origin="https://chat.openai.com")
 
@@ -22,13 +23,13 @@ def get_isodatetime(strdatetime):
 
 # Keep track of todo's. Does not persist if Python session is restarted.
 _TODOS = {}
-   
+
 @app.post("/reserve")
 async def reserve_restaurant():
     request = await quart.request.get_json(force=True)
-    print(request)
+    logging.info(request)
     datetime = request['datetime']
-    print(get_isodatetime(datetime))
+    logging.info(get_isodatetime(datetime))
 
     return quart.Response(response='OK', status=200)
 
@@ -37,8 +38,8 @@ async def search():
 
     query = request.args.get("q")
     datetime = request.args.get("datetime")
-    print(query, datetime)
-    print(get_isodatetime(datetime))
+    logging.info(query, datetime)
+    logging.info(get_isodatetime(datetime))
     list_rest = [{"cafename": "カフェかば殿", "2023/07/01 18:00-19:00": "空き"}]
 
     list_search = list(filter(lambda item : item['cafename'] == query, list_rest))
@@ -55,14 +56,14 @@ async def plugin_logo():
 
 @app.get("/.well-known/ai-plugin.json")
 async def plugin_manifest():
-    host = request.headers['Host']
+    request.headers['Host']
     with open("./.well-known/ai-plugin.json") as f:
         text = f.read()
         return quart.Response(text, mimetype="text/json")
 
 @app.get("/openapi.yaml")
 async def openapi_spec():
-    host = request.headers['Host']
+    request.headers['Host']
     with open("openapi.yaml") as f:
         text = f.read()
         return quart.Response(text, mimetype="text/yaml")

@@ -1,21 +1,23 @@
+import csv
+import logging
 from typing import Any
 
 import openai
 from azure.search.documents.aio import SearchClient
 from azure.search.documents.models import QueryType
-from langchain.agents import AgentExecutor, Tool, ZeroShotAgent
-from langchain.callbacks.manager import CallbackManager, Callbacks
+from langchain.agents import (
+    AgentType,
+    Tool,
+    initialize_agent,
+)
+from langchain.agents.mrkl import prompt
+from langchain.callbacks.manager import CallbackManager
 from langchain.chat_models import AzureChatOpenAI
-from langchain.tools import tool
+from langchain.tools import BaseTool
+
 from approaches.approach import AskApproach
 from langchainadapters import HtmlCallbackHandler
 from text import nonewlines
-
-from langchain.agents import load_tools, initialize_agent
-from langchain.agents import AgentType
-from langchain.tools import BaseTool
-from langchain.agents.mrkl import prompt
-import csv
 
 class ReadRetrieveReadApproach(AskApproach):
     """
@@ -29,35 +31,6 @@ class ReadRetrieveReadApproach(AskApproach):
     [1] E. Karpas, et al. arXiv:2205.00445
     """
 
-    template_prefix = \
-"You are an intelligent assistant helping Contoso Inc employees with their healthcare plan questions and employee handbook questions. " \
-"Answer the question using only the data provided in the information sources below. " \
-"For tabular information return it as an html table. Do not return markdown format. " \
-"Each source has a name followed by colon and the actual data, quote the source name for each piece of data you use in the response. " \
-"For example, if the question is \"What color is the sky?\" and one of the information sources says \"info123: the sky is blue whenever it's not cloudy\", then answer with \"The sky is blue [info123]\" " \
-"It's important to strictly follow the format where the name of the source is in square brackets at the end of the sentence, and only up to the prefix before the colon (\":\"). " \
-"If there are multiple sources, cite each one in their own square brackets. For example, use \"[info343][ref-76]\" and not \"[info343,ref-76]\". " \
-"Never quote tool names as sources." \
-"If you cannot answer using the sources below, say that you don't know. " \
-"\n\nYou can access to the following tools:"
-
-    template_prefix_jp = \
-"あなたは日本の歴史に関する質問をサポートする教師アシスタントです。" \
-"以下の情報源に記載されているデータのみを用いて、質問に答えてください。" \
-"表形式の情報については、htmlテーブルとして返してください。マークダウン形式で返さないでください。" \
-"各ソースには、名前の後にコロンと実際のデータがあり、レスポンスで使用する各データのソース名を引用します。" \
-"例えば、質問が「空の色は何色ですか」というもので、ソースの1つに「info-123.txt:空は曇っていないときはいつでも青い」と書いてあれば、「空は青い [info-123.txt]」と答えればよいのです。" \
-"各出典元には、名前の後にコロンと実際の情報があり、回答で使用する各事実には必ず出典名を記載してください。ソースを参照するには、四角いブラケットを使用します。例えば、[info1.txt]です。出典を組み合わせず、各出典を別々に記載すること。例えば、[info1.txt][info2.pdf] など。" \
-"ツール名をソースとして引用することは絶対に避けてください。" \
-"以下の資料で答えられない場合は、「わからない」と答えてください。" \
-"\n\n以下のツールにアクセスすることができます:"
-
-    template_suffix = """
-Begin!
-
-Question: {input}
-
-Thought: {agent_scratchpad}"""
     def __init__(self, search_client: SearchClient, openai_deployment: str, embedding_deployment: str, sourcepage_field: str, content_field: str):
         self.search_client = search_client
         self.openai_deployment = openai_deployment
@@ -109,35 +82,43 @@ Thought: {agent_scratchpad}"""
         content = "\n".join(results)
         return results, content
 
-    async def run(self, q: str, overrides: dict[str, Any]) -> Any:
+    async def run(self, q: str, overrides: dict[str, Any]) -> dict[str, Any]:
 
         retrieve_results = None
         async def retrieve_and_store(q: str) -> Any:
             nonlocal retrieve_results
             retrieve_results, content = await self.retrieve(q, overrides)
             return content
-        
+
         # Use to capture thought process during iterations
         cb_handler = HtmlCallbackHandler()
         cb_manager = CallbackManager(handlers=[cb_handler])
 
         # Tool dataclass 法と Subclassing the BaseTool class 法の異なる記法を示しています
         tools = [
-            Tool(name="CognitiveSearch",
+            Tool(name="PeopleSearchTool",
                 func=retrieve_and_store,
                 coroutine=retrieve_and_store,
-                description="日本の歴史の人物情報の検索に便利です。ユーザーの質問から検索クエリーを生成して検索します。"
+                description="日本の歴史の人物情報の検索に便利です。ユーザーの質問から検索クエリーを生成して検索します。クエリーは文字列のみを受け付けます"
                 ),
             CafeSearchTool()
         ]
-
-        llm = AzureChatOpenAI(deployment_name=self.openai_deployment, temperature=overrides.get("temperature") or 0.3, openai_api_base=openai.api_base, openai_api_version=openai.api_version, openai_api_type=openai.api_type, openai_api_key=openai.api_key)
+        
+       #llm = ChatOpenAI(model_name="gpt-4-0613", temperature=0)
+        llm = AzureChatOpenAI(deployment_name=self.openai_deployment,
+                              temperature=overrides.get("temperature") or 0.3,
+                              openai_api_base=openai.api_base,
+                              openai_api_version=openai.api_version,
+                              openai_api_type=openai.api_type,
+                              openai_api_key=openai.api_key)
         SUFFIX = """
         Answer should be in Japanese.
         """
         agent_chain = initialize_agent(tools,
                                     llm,
-                                    agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION, verbose=True,
+                                    agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
+                                    #agent=AgentType.OPENAI_FUNCTIONS,
+                                    verbose=True,
                                     agent_kwargs=dict(suffix=SUFFIX + prompt.SUFFIX),
                                     callback_manager = cb_manager,
                                     handle_parsing_errors=True,
@@ -159,13 +140,13 @@ Thought: {agent_scratchpad}"""
 class CafeSearchTool(BaseTool):
     data: dict[str, str] = {}
     name = "CafeSearchTool"
-    description = "武将のゆかりのカフェを検索するのに便利です。カフェの検索クエリには、武将の名前を入力してください。"
-    
+    description = "武将のゆかりのカフェを検索するのに便利です。カフェの検索クエリには、武将の**名前のみ**を入力してください。"
+
     # Use the tool synchronously.
     def _run(self, query: str) -> str:
         """Use the tool."""
         return query
-    
+
     # Use the tool asynchronously.
     async def _arun(self, query: str) -> str:
         filename = "data/restaurantinfo.csv"
@@ -177,6 +158,6 @@ class CafeSearchTool(BaseTool):
                     self.data[row[key_field]] =  "\n".join([f"{i}:{row[i]}" for i in row])
 
         except Exception as e:
-            print("File read error:", e)
+            logging.exception("File read error:", e)
 
         return self.data.get(query, "")

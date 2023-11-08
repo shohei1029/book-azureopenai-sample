@@ -11,6 +11,7 @@ import { AnswerIcon } from "./AnswerIcon";
 interface Props {
     answer: AskResponse;
     isSelected?: boolean;
+    isStreaming: boolean;
     onCitationClicked: (filePath: string) => void;
     onThoughtProcessClicked: () => void;
     onSupportingContentClicked: () => void;
@@ -21,13 +22,14 @@ interface Props {
 export const Answer = ({
     answer,
     isSelected,
+    isStreaming,
     onCitationClicked,
     onThoughtProcessClicked,
     onSupportingContentClicked,
     onFollowupQuestionClicked,
     showFollowupQuestions
 }: Props) => {
-    const parsedAnswer = useMemo(() => parseAnswerToHtml(answer.answer, onCitationClicked), [answer]);
+    const parsedAnswer = useMemo(() => parseAnswerToHtml(answer.answer, isStreaming, onCitationClicked), [answer]);
 
     const sanitizedAnswerHtml = DOMPurify.sanitize(parsedAnswer.answerHtml);
 
@@ -40,18 +42,18 @@ export const Answer = ({
                         <IconButton
                             style={{ color: "black" }}
                             iconProps={{ iconName: "Lightbulb" }}
-                            title="Show thought process"
-                            ariaLabel="Show thought process"
+                            title="推論プロセスを表示"
+                            ariaLabel="推論プロセスを表示"
                             onClick={() => onThoughtProcessClicked()}
                             disabled={!answer.thoughts}
                         />
                         <IconButton
                             style={{ color: "black" }}
                             iconProps={{ iconName: "ClipboardList" }}
-                            title="Show supporting content"
-                            ariaLabel="Show supporting content"
+                            title="検索コンテンツを表示"
+                            ariaLabel="検索コンテンツを表示"
                             onClick={() => onSupportingContentClicked()}
-                            disabled={!answer.data_points.length}
+                            disabled={!answer.data_points?.length}
                         />
                     </div>
                 </Stack>
@@ -77,7 +79,7 @@ export const Answer = ({
                 </Stack.Item>
             )}
 
-            {!!parsedAnswer.followupQuestions.length && showFollowupQuestions && onFollowupQuestionClicked && (
+            {!!parsedAnswer.followupQuestions?.length && showFollowupQuestions && onFollowupQuestionClicked && (
                 <Stack.Item>
                     <Stack horizontal wrap className={`${!!parsedAnswer.citations.length ? styles.followupQuestionsList : ""}`} tokens={{ childrenGap: 6 }}>
                         <span className={styles.followupQuestionLearnMore}>Follow-up questions:</span>

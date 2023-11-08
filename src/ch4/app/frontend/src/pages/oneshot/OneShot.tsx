@@ -16,9 +16,9 @@ export function Component(): JSX.Element {
     const [promptTemplate, setPromptTemplate] = useState<string>("");
     const [promptTemplatePrefix, setPromptTemplatePrefix] = useState<string>("");
     const [promptTemplateSuffix, setPromptTemplateSuffix] = useState<string>("");
-    const [retrievalMode, setRetrievalMode] = useState<RetrievalMode>(RetrievalMode.Hybrid);
+    const [retrievalMode, setRetrievalMode] = useState<RetrievalMode>(RetrievalMode.Text);
     const [retrieveCount, setRetrieveCount] = useState<number>(3);
-    const [useSemanticRanker, setUseSemanticRanker] = useState<boolean>(true);
+    const [useSemanticRanker, setUseSemanticRanker] = useState<boolean>(false);
     const [useSemanticCaptions, setUseSemanticCaptions] = useState<boolean>(false);
     const [excludeCategory, setExcludeCategory] = useState<string>("");
 
@@ -123,19 +123,15 @@ export function Component(): JSX.Element {
     const approaches: IChoiceGroupOption[] = [
         {
             key: Approaches.RetrieveThenRead,
-            text: "Retrieve-Then-Read"
+            text: "一問一答"
         },
         {
             key: Approaches.ReadRetrieveRead,
-            text: "Read-Retrieve-Read"
+            text: "ツール選定（ReAct）"
         },
-        // {
-        //     key: Approaches.ReadDecomposeAsk,
-        //     text: "Read-Decompose-Ask"
-        // },
         {
             key: Approaches.ReadPluginsRetrieve,
-            text: "Read-Plugins-Retrieve"
+            text: "ChatGPT プラグイン"
         }
     ];
 
@@ -145,20 +141,17 @@ export function Component(): JSX.Element {
                 <SettingsButton className={styles.settingsButton} onClick={() => setIsConfigPanelOpen(!isConfigPanelOpen)} />
                 <h1 className={styles.oneshotTitle}>Ask your data</h1>
                 <div className={styles.oneshotQuestionInput}>
-                    <QuestionInput
-                        placeholder="Example: Does my plan cover annual eye exams?"
-                        disabled={isLoading}
-                        onSend={question => makeApiRequest(question)}
-                    />
+                    <QuestionInput placeholder="こちらに質問をどうぞ" disabled={isLoading} onSend={question => makeApiRequest(question)} />
                 </div>
             </div>
             <div className={styles.oneshotBottomSection}>
-                {isLoading && <Spinner label="Generating answer" />}
+                {isLoading && <Spinner label="回答を生成しています..." />}
                 {!lastQuestionRef.current && <ExampleList onExampleClicked={onExampleClicked} />}
                 {!isLoading && answer && !error && (
                     <div className={styles.oneshotAnswerContainer}>
                         <Answer
                             answer={answer}
+                            isStreaming={false}
                             onCitationClicked={x => onShowCitation(x)}
                             onThoughtProcessClicked={() => onToggleTab(AnalysisPanelTabs.ThoughtProcessTab)}
                             onSupportingContentClicked={() => onToggleTab(AnalysisPanelTabs.SupportingContentTab)}
@@ -183,7 +176,7 @@ export function Component(): JSX.Element {
             </div>
 
             <Panel
-                headerText="Configure answer generation"
+                headerText="回答生成の設定"
                 isOpen={isConfigPanelOpen}
                 isBlocking={false}
                 onDismiss={() => setIsConfigPanelOpen(false)}
@@ -193,7 +186,7 @@ export function Component(): JSX.Element {
             >
                 <ChoiceGroup
                     className={styles.oneshotSettingsSeparator}
-                    label="Approach"
+                    label="アプローチ"
                     options={approaches}
                     defaultSelectedKey={approach}
                     onChange={onApproachChange}
@@ -203,7 +196,7 @@ export function Component(): JSX.Element {
                     <TextField
                         className={styles.oneshotSettingsSeparator}
                         defaultValue={promptTemplate}
-                        label="Override prompt template"
+                        label="プロンプトテンプレートを上書きする"
                         multiline
                         autoAdjustHeight
                         onChange={onPromptTemplateChange}
@@ -215,7 +208,7 @@ export function Component(): JSX.Element {
                         <TextField
                             className={styles.oneshotSettingsSeparator}
                             defaultValue={promptTemplatePrefix}
-                            label="Override prompt prefix template"
+                            label="プロンプト接頭辞テンプレートを上書き"
                             multiline
                             autoAdjustHeight
                             onChange={onPromptTemplatePrefixChange}
@@ -223,7 +216,7 @@ export function Component(): JSX.Element {
                         <TextField
                             className={styles.oneshotSettingsSeparator}
                             defaultValue={promptTemplateSuffix}
-                            label="Override prompt suffix template"
+                            label="プロンプト接尾辞テンプレートを上書き"
                             multiline
                             autoAdjustHeight
                             onChange={onPromptTemplateSuffixChange}
@@ -233,29 +226,29 @@ export function Component(): JSX.Element {
 
                 <SpinButton
                     className={styles.oneshotSettingsSeparator}
-                    label="Retrieve this many documents from search:"
+                    label="検索からこの数の文書を取得:"
                     min={1}
                     max={50}
                     defaultValue={retrieveCount.toString()}
                     onChange={onRetrieveCountChange}
                 />
-                <TextField className={styles.oneshotSettingsSeparator} label="Exclude category" onChange={onExcludeCategoryChanged} />
+                <TextField className={styles.oneshotSettingsSeparator} label="除外カテゴリー" onChange={onExcludeCategoryChanged} />
                 <Checkbox
                     className={styles.oneshotSettingsSeparator}
                     checked={useSemanticRanker}
-                    label="Use semantic ranker for retrieval"
+                    label="検索にセマンティックランカーを使う"
                     onChange={onUseSemanticRankerChange}
                 />
                 <Checkbox
                     className={styles.oneshotSettingsSeparator}
                     checked={useSemanticCaptions}
-                    label="Use query-contextual summaries instead of whole documents"
+                    label="文書全体ではなく、クエリコンテキストサマリーを使用する"
                     onChange={onUseSemanticCaptionsChange}
                     disabled={!useSemanticRanker}
                 />
                 <Dropdown
                     className={styles.oneshotSettingsSeparator}
-                    label="Retrieval mode"
+                    label="検索モード"
                     options={[
                         { key: "hybrid", text: "Vectors + Text (Hybrid)", selected: retrievalMode == RetrievalMode.Hybrid, data: RetrievalMode.Hybrid },
                         { key: "vectors", text: "Vectors", selected: retrievalMode == RetrievalMode.Vectors, data: RetrievalMode.Vectors },

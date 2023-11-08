@@ -1,6 +1,7 @@
 import { useRef, useState, useEffect } from "react";
 import { Checkbox, Panel, DefaultButton, TextField, SpinButton, Dropdown, IDropdownOption } from "@fluentui/react";
 import { SparkleFilled } from "@fluentui/react-icons";
+import readNDJSONStream from "ndjson-readablestream";
 
 import styles from "./Chat.module.css";
 
@@ -19,6 +20,7 @@ const Chat = () => {
     const [retrieveCount, setRetrieveCount] = useState<number>(3);
     const [retrievalMode, setRetrievalMode] = useState<RetrievalMode>(RetrievalMode.Text);
     const [useSemanticRanker, setUseSemanticRanker] = useState<boolean>(false);
+    const [shouldStream, setShouldStream] = useState<boolean>(false);
     const [useSemanticCaptions, setUseSemanticCaptions] = useState<boolean>(false);
     const [excludeCategory, setExcludeCategory] = useState<string>("");
     const [useSuggestFollowupQuestions, setUseSuggestFollowupQuestions] = useState<boolean>(true);
@@ -27,6 +29,7 @@ const Chat = () => {
     const chatMessageStreamEnd = useRef<HTMLDivElement | null>(null);
 
     const [isLoading, setIsLoading] = useState<boolean>(false);
+    const [isStreaming, setIsStreaming] = useState<boolean>(false);
     const [error, setError] = useState<unknown>();
 
     const [activeCitation, setActiveCitation] = useState<string>();
@@ -34,6 +37,42 @@ const Chat = () => {
 
     const [selectedAnswer, setSelectedAnswer] = useState<number>(0);
     const [answers, setAnswers] = useState<[user: string, response: AskResponse][]>([]);
+    const [streamedAnswers, setStreamedAnswers] = useState<[user: string, response: AskResponse][]>([]);
+
+    const handleAsyncRequest = async (question: string, answers: [string, AskResponse][], setAnswers: Function, responseBody: ReadableStream<any>) => {
+        let answer: string = "";
+        let askResponse: AskResponse = {} as AskResponse;
+
+        const updateState = (newContent: string) => {
+            return new Promise(resolve => {
+                setTimeout(() => {
+                    answer += newContent;
+                    let latestResponse: AskResponse = { ...askResponse, answer: answer };
+                    setStreamedAnswers([...answers, [question, latestResponse]]);
+                    resolve(null);
+                }, 33);
+            });
+        };
+
+        try {
+            setIsStreaming(true);
+            for await (const event of readNDJSONStream(responseBody)) {
+                if (event["data_points"]) {
+                    askResponse = event;
+                } else if (event["choices"]) {
+                    if (event["choices"].length == 0) {
+                    } else if (event["choices"][0]["delta"]["content"]) {
+                        setIsLoading(false);
+                        await updateState(event["choices"][0]["delta"]["content"]);
+                    }
+                }
+            }
+        } finally {
+            setIsStreaming(false);
+        }
+        const fullResponse: AskResponse = { ...askResponse, answer: answer };
+        return fullResponse;
+    };
 
     const makeApiRequest = async (question: string) => {
         lastQuestionRef.current = question;
@@ -48,6 +87,7 @@ const Chat = () => {
             const request: ChatRequest = {
                 history: [...history, { user: question, bot: undefined }],
                 approach: Approaches.ReadRetrieveRead,
+                shouldStream: shouldStream,
                 overrides: {
                     promptTemplate: promptTemplate.length === 0 ? undefined : promptTemplate,
                     excludeCategory: excludeCategory.length === 0 ? undefined : excludeCategory,
@@ -58,9 +98,21 @@ const Chat = () => {
                     suggestFollowupQuestions: useSuggestFollowupQuestions
                 }
             };
-            const result = await chatApi(request);
-            setAnswers([...answers, [question, result]]);
-            console.log([...answers, [question, result]]);
+
+            const response = await chatApi(request);
+            if (!response.body) {
+                throw Error("No response body");
+            }
+            if (shouldStream) {
+                const parsedResponse: AskResponse = await handleAsyncRequest(question, answers, setAnswers, response.body);
+                setAnswers([...answers, [question, parsedResponse]]);
+            } else {
+                const parsedResponse: AskResponse = await response.json();
+                if (response.status > 299 || !response.ok) {
+                    throw Error(parsedResponse.error || "Unknown error");
+                }
+                setAnswers([...answers, [question, parsedResponse]]);
+            }
         } catch (e) {
             setError(e);
         } finally {
@@ -74,9 +126,13 @@ const Chat = () => {
         setActiveCitation(undefined);
         setActiveAnalysisPanelTab(undefined);
         setAnswers([]);
+        setStreamedAnswers([]);
+        setIsLoading(false);
+        setIsStreaming(false);
     };
 
     useEffect(() => chatMessageStreamEnd.current?.scrollIntoView({ behavior: "smooth" }), [isLoading]);
+    useEffect(() => chatMessageStreamEnd.current?.scrollIntoView({ behavior: "auto" }), [streamedAnswers]);
 
     const onPromptTemplateChange = (_ev?: React.FormEvent<HTMLInputElement | HTMLTextAreaElement>, newValue?: string) => {
         setPromptTemplate(newValue || "");
@@ -96,6 +152,10 @@ const Chat = () => {
 
     const onUseSemanticCaptionsChange = (_ev?: React.FormEvent<HTMLElement | HTMLInputElement>, checked?: boolean) => {
         setUseSemanticCaptions(!!checked);
+    };
+
+    const onShouldStreamChange = (_ev?: React.FormEvent<HTMLElement | HTMLInputElement>, checked?: boolean) => {
+        setShouldStream(!!checked);
     };
 
     const onExcludeCategoryChanged = (_ev?: React.FormEvent, newValue?: string) => {
@@ -148,23 +208,44 @@ const Chat = () => {
                         </div>
                     ) : (
                         <div className={styles.chatMessageStream}>
-                            {answers.map((answer, index) => (
-                                <div key={index}>
-                                    <UserChatMessage message={answer[0]} />
-                                    <div className={styles.chatMessageGpt}>
-                                        <Answer
-                                            key={index}
-                                            answer={answer[1]}
-                                            isSelected={selectedAnswer === index && activeAnalysisPanelTab !== undefined}
-                                            onCitationClicked={c => onShowCitation(c, index)}
-                                            onThoughtProcessClicked={() => onToggleTab(AnalysisPanelTabs.ThoughtProcessTab, index)}
-                                            onSupportingContentClicked={() => onToggleTab(AnalysisPanelTabs.SupportingContentTab, index)}
-                                            onFollowupQuestionClicked={q => makeApiRequest(q)}
-                                            showFollowupQuestions={useSuggestFollowupQuestions && answers.length - 1 === index}
-                                        />
+                            {isStreaming &&
+                                streamedAnswers.map((streamedAnswer, index) => (
+                                    <div key={index}>
+                                        <UserChatMessage message={streamedAnswer[0]} />
+                                        <div className={styles.chatMessageGpt}>
+                                            <Answer
+                                                isStreaming={true}
+                                                key={index}
+                                                answer={streamedAnswer[1]}
+                                                isSelected={false}
+                                                onCitationClicked={c => onShowCitation(c, index)}
+                                                onThoughtProcessClicked={() => onToggleTab(AnalysisPanelTabs.ThoughtProcessTab, index)}
+                                                onSupportingContentClicked={() => onToggleTab(AnalysisPanelTabs.SupportingContentTab, index)}
+                                                onFollowupQuestionClicked={q => makeApiRequest(q)}
+                                                showFollowupQuestions={useSuggestFollowupQuestions && answers.length - 1 === index}
+                                            />
+                                        </div>
                                     </div>
-                                </div>
-                            ))}
+                                ))}
+                            {!isStreaming &&
+                                answers.map((answer, index) => (
+                                    <div key={index}>
+                                        <UserChatMessage message={answer[0]} />
+                                        <div className={styles.chatMessageGpt}>
+                                            <Answer
+                                                isStreaming={false}
+                                                key={index}
+                                                answer={answer[1]}
+                                                isSelected={selectedAnswer === index && activeAnalysisPanelTab !== undefined}
+                                                onCitationClicked={c => onShowCitation(c, index)}
+                                                onThoughtProcessClicked={() => onToggleTab(AnalysisPanelTabs.ThoughtProcessTab, index)}
+                                                onSupportingContentClicked={() => onToggleTab(AnalysisPanelTabs.SupportingContentTab, index)}
+                                                onFollowupQuestionClicked={q => makeApiRequest(q)}
+                                                showFollowupQuestions={useSuggestFollowupQuestions && answers.length - 1 === index}
+                                            />
+                                        </div>
+                                    </div>
+                                ))}
                             {isLoading && (
                                 <>
                                     <UserChatMessage message={lastQuestionRef.current} />
@@ -186,12 +267,7 @@ const Chat = () => {
                     )}
 
                     <div className={styles.chatInput}>
-                        <QuestionInput
-                            clearOnSend
-                            placeholder="Type a new question (e.g. does my plan cover annual eye exams?)"
-                            disabled={isLoading}
-                            onSend={question => makeApiRequest(question)}
-                        />
+                        <QuestionInput clearOnSend placeholder="こちらに質問をどうぞ" disabled={isLoading} onSend={question => makeApiRequest(question)} />
                     </div>
                 </div>
 
@@ -207,7 +283,7 @@ const Chat = () => {
                 )}
 
                 <Panel
-                    headerText="Configure answer generation"
+                    headerText="回答生成の設定"
                     isOpen={isConfigPanelOpen}
                     isBlocking={false}
                     onDismiss={() => setIsConfigPanelOpen(false)}
@@ -218,7 +294,7 @@ const Chat = () => {
                     <TextField
                         className={styles.chatSettingsSeparator}
                         defaultValue={promptTemplate}
-                        label="Override prompt template"
+                        label="プロンプトテンプレートを上書きする"
                         multiline
                         autoAdjustHeight
                         onChange={onPromptTemplateChange}
@@ -226,35 +302,35 @@ const Chat = () => {
 
                     <SpinButton
                         className={styles.chatSettingsSeparator}
-                        label="Retrieve this many documents from search:"
+                        label="検索からこの数の文書を取得:"
                         min={1}
                         max={50}
                         defaultValue={retrieveCount.toString()}
                         onChange={onRetrieveCountChange}
                     />
-                    <TextField className={styles.chatSettingsSeparator} label="Exclude category" onChange={onExcludeCategoryChanged} />
+                    <TextField className={styles.chatSettingsSeparator} label="除外カテゴリー" onChange={onExcludeCategoryChanged} />
                     <Checkbox
                         className={styles.chatSettingsSeparator}
                         checked={useSemanticRanker}
-                        label="Use semantic ranker for retrieval"
+                        label="検索にセマンティックランカーを使う"
                         onChange={onUseSemanticRankerChange}
                     />
                     <Checkbox
                         className={styles.chatSettingsSeparator}
                         checked={useSemanticCaptions}
-                        label="Use query-contextual summaries instead of whole documents"
+                        label="文書全体ではなく、クエリコンテキストサマリーを使用する"
                         onChange={onUseSemanticCaptionsChange}
                         disabled={!useSemanticRanker}
                     />
                     <Checkbox
                         className={styles.chatSettingsSeparator}
                         checked={useSuggestFollowupQuestions}
-                        label="Suggest follow-up questions"
+                        label="フォローアップ質問を提案する"
                         onChange={onUseSuggestFollowupQuestionsChange}
                     />
                     <Dropdown
                         className={styles.chatSettingsSeparator}
-                        label="Retrieval mode"
+                        label="検索モード"
                         options={[
                             { key: "hybrid", text: "Vectors + Text (Hybrid)", selected: retrievalMode == RetrievalMode.Hybrid, data: RetrievalMode.Hybrid },
                             { key: "vectors", text: "Vectors", selected: retrievalMode == RetrievalMode.Vectors, data: RetrievalMode.Vectors },
@@ -262,6 +338,12 @@ const Chat = () => {
                         ]}
                         required
                         onChange={onRetrievalModeChange}
+                    />
+                    <Checkbox
+                        className={styles.chatSettingsSeparator}
+                        checked={shouldStream}
+                        label="チャットの応答をストリームする"
+                        onChange={onShouldStreamChange}
                     />
                 </Panel>
             </div>

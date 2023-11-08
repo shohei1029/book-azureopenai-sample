@@ -22,7 +22,7 @@
     "forwardPorts": [
         50505
     ],
-    "postCreateCommand": "",
+    "postCreateCommand": "cd app;./start.sh",
     "remoteUser": "vscode",
     "hostRequirements": {
         "memory": "8gb"

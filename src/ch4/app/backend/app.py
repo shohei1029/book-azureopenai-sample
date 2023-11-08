@@ -1,10 +1,15 @@
 import io
+import json
 import logging
 import mimetypes
 import os
 import time
+from typing import AsyncGenerator
 
+import aiohttp
 import openai
+
+#Cosmos DB
 from azure.identity.aio import DefaultAzureCredential
 from azure.monitor.opentelemetry import configure_azure_monitor
 from azure.search.documents.aio import SearchClient
@@ -17,19 +22,16 @@ from quart import (
     abort,
     current_app,
     jsonify,
+    make_response,
     request,
     send_file,
     send_from_directory,
 )
 
 from approaches.chatreadretrieveread import ChatReadRetrieveReadApproach
-from approaches.chatreadretrieveread_cosmosdb import ChatReadRetrieveReadApproachCosmosDB
-from approaches.readdecomposeask import ReadDecomposeAsk
+from approaches.readpluginsretrieve import ReadPluginsRetrieve
 from approaches.readretrieveread import ReadRetrieveReadApproach
 from approaches.retrievethenread import RetrieveThenReadApproach
-from approaches.readpluginsretrieve import ReadPluginsRetrieve
-#Cosmos DB
-from azure.cosmos import CosmosClient, PartitionKey
 
 # Replace these with your own values, either in environment variables or directly here
 AZURE_STORAGE_ACCOUNT = os.getenv("AZURE_STORAGE_ACCOUNT", "mystorageaccount")
@@ -37,8 +39,9 @@ AZURE_STORAGE_CONTAINER = os.getenv("AZURE_STORAGE_CONTAINER", "content")
 AZURE_SEARCH_SERVICE = os.getenv("AZURE_SEARCH_SERVICE", "gptkb")
 AZURE_SEARCH_INDEX = os.getenv("AZURE_SEARCH_INDEX", "gptkbindex")
 AZURE_OPENAI_SERVICE = os.getenv("AZURE_OPENAI_SERVICE", "myopenai")
-AZURE_OPENAI_CHATGPT_DEPLOYMENT = os.getenv("AZURE_OPENAI_CHATGPT_DEPLOYMENT", "chat")
 AZURE_OPENAI_CHATGPT_MODEL = os.getenv("AZURE_OPENAI_CHATGPT_MODEL", "gpt-35-turbo-16k")
+AZURE_OPENAI_GPT_DEPLOYMENT = os.getenv("AZURE_OPENAI_GPT_DEPLOYMENT", "davinci")
+AZURE_OPENAI_CHATGPT_DEPLOYMENT = os.getenv("AZURE_OPENAI_CHATGPT_DEPLOYMENT", "chat16k")
 AZURE_OPENAI_EMB_DEPLOYMENT = os.getenv("AZURE_OPENAI_EMB_DEPLOYMENT", "embedding")
 
 KB_FIELDS_CONTENT = os.getenv("KB_FIELDS_CONTENT", "content")
@@ -72,13 +75,13 @@ async def assets(path):
 # can access all the files. This is also slow and memory hungry.
 
 # この例を自己完結的なものにするために、アプリ内からblobストレージにコンテンツファイルを配信する。
-# *** NOTE *** この例では、コンテンツファイルが公開されているか、少なくともアプリの全ユーザーが 
+# *** NOTE *** この例では、コンテンツファイルが公開されているか、少なくともアプリの全ユーザーが
 # すべてのファイルにアクセスできることを前提としています。また, これは低速でメモリを消費します.
 @bp.route("/content/<path>")
 async def content_file(path):
-    print("content_file: " + path)
+    logging.info("content_file: " + path)
     blob_container = current_app.config[CONFIG_BLOB_CLIENT].get_container_client(AZURE_STORAGE_CONTAINER)
-    print("blob_container: " + blob_container.get_blob_client(path).url)
+    logging.info("blob_container: " + blob_container.get_blob_client(path).url)
     blob = await blob_container.get_blob_client(path).download_blob()
     if not blob.properties or not blob.properties.has_key("content_settings"):
         abort(404)
@@ -103,7 +106,7 @@ async def ask():
         #plugin の場合、非同期だと失敗するので同期で実行
         if approach == "rpr":
             r = impl.run(request_json["question"], request_json.get("overrides") or {})
-            print("ReadPluginsRetrieve is completed.")
+            logging.info("ReadPluginsRetrieve is completed.")
         else:
             r = await impl.run(request_json["question"], request_json.get("overrides") or {})
         return jsonify(r)
@@ -121,11 +124,38 @@ async def chat():
         impl = current_app.config[CONFIG_CHAT_APPROACHES].get(approach)
         if not impl:
             return jsonify({"error": "unknown approach"}), 400
-        r = await impl.run(request_json["history"], request_json.get("overrides") or {})
+        # Workaround for: https://github.com/openai/openai-python/issues/371
+        async with aiohttp.ClientSession() as s:
+            openai.aiosession.set(s)
+            r = await impl.run_without_streaming(request_json["history"], request_json.get("overrides", {}))
         return jsonify(r)
     except Exception as e:
         logging.exception("Exception in /chat")
         return jsonify({"error": str(e)}), 500
+
+
+async def format_as_ndjson(r: AsyncGenerator[dict, None]) -> AsyncGenerator[str, None]:
+    async for event in r:
+        yield json.dumps(event, ensure_ascii=False) + "\n"
+
+@bp.route("/chat_stream", methods=["POST"])
+async def chat_stream():
+    if not request.is_json:
+        return jsonify({"error": "request must be json"}), 415
+    request_json = await request.get_json()
+    approach = request_json["approach"]
+    try:
+        impl = current_app.config[CONFIG_CHAT_APPROACHES].get(approach)
+        if not impl:
+            return jsonify({"error": "unknown approach"}), 400
+        response_generator = impl.run_with_streaming(request_json["history"], request_json.get("overrides", {}))
+        response = await make_response(format_as_ndjson(response_generator))
+        response.timeout = None # type: ignore
+        return response
+    except Exception as e:
+        logging.exception("Exception in /chat")
+        return jsonify({"error": str(e)}), 500
+
 
 @bp.before_request
 async def ensure_openai_token():
@@ -155,21 +185,21 @@ async def setup_clients():
     blob_client = BlobServiceClient(
         account_url=f"https://{AZURE_STORAGE_ACCOUNT}.blob.core.windows.net",
         credential=azure_credential)
-    
+
     # Set up a Cosmos DB client to store the chat history
-    endpoint = 'https://<Your-CosmosDB-Account>.documents.azure.com:443/'
-    key = '<Your-CosmosDB-Key>'
-    cosmos_container = []
-    try:
-        cosmos_client = CosmosClient(url=endpoint, credential=key)
-        database = cosmos_client.create_database_if_not_exists(id="ChatGPT")
-        partitionKeyPath = PartitionKey(path="/id")
-        cosmos_container = database.create_container_if_not_exists(
-            id="ChatLogs", partition_key=partitionKeyPath
-        )
-    except Exception as e:
-        print(e)
-        pass
+    # endpoint = 'https://<Your-CosmosDB-Account>.documents.azure.com:443/'
+    # key = '<Your-CosmosDB-Key>'
+    # cosmos_container = []
+    # try:
+    #     cosmos_client = CosmosClient(url=endpoint, credential=key)
+    #     database = cosmos_client.create_database_if_not_exists(id="ChatGPT")
+    #     partitionKeyPath = PartitionKey(path="/id")
+    #     cosmos_container = database.create_container_if_not_exists(
+    #         id="ChatLogs", partition_key=partitionKeyPath
+    #     )
+    # except Exception as e:
+    #     logging.exception(e)
+    #     pass
 
     # Used by the OpenAI SDK
     openai.api_base = f"https://{AZURE_OPENAI_SERVICE}.openai.azure.com"
@@ -207,12 +237,6 @@ async def setup_clients():
         "rpr": ReadPluginsRetrieve(
             AZURE_OPENAI_CHATGPT_DEPLOYMENT
         )
-        # "rda": ReadDecomposeAsk(search_client,
-        #     AZURE_OPENAI_CHATGPT_DEPLOYMENT,
-        #     AZURE_OPENAI_EMB_DEPLOYMENT,
-        #     KB_FIELDS_SOURCEPAGE,
-        #     KB_FIELDS_CONTENT
-        # )
     }
     current_app.config[CONFIG_CHAT_APPROACHES] = {
         "rrr": ChatReadRetrieveReadApproach(

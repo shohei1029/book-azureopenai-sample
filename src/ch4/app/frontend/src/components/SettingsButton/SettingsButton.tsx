@@ -12,7 +12,7 @@ export const SettingsButton = ({ className, onClick }: Props) => {
     return (
         <div className={`${styles.container} ${className ?? ""}`} onClick={onClick}>
             <Settings24Regular />
-            <Text>{"Developer settings"}</Text>
+            <Text>{"開発者設定"}</Text>
         </div>
     );
 };
