@@ -8,6 +8,7 @@
   - [コスト見積もり](#コスト見積もり)
   - [前提条件](#前提条件)
     - [ローカルで実行する場合](#ローカルで実行する場合)
+    - [GitHub Codespaces または VS Code Remote Containers で実行する場合](#github-codespaces-または-vs-code-remote-containers-で実行する場合)
   - [新規でデプロイする](#新規でデプロイする)
   - [既存のリソースでのデプロイ](#既存のリソースでのデプロイ)
   - [再デプロイ](#再デプロイ)
@@ -17,7 +18,6 @@
 - [オプション機能の有効化](#オプション機能の有効化)
   - [Application Insights の有効化](#application-insights-の有効化)
   - [認証の有効化](#認証の有効化)
-- [GitHub Codespaces または VS Code Remote Containers で実行する場合](#github-codespaces-または-vs-code-remote-containers-で実行する場合)
 - [Resources](#resources)
   - [FAQ](#faq)
   - [トラブルシューティング](#トラブルシューティング)
@@ -56,7 +56,7 @@
 - Azure App Service: Basic Tier、1CPU コア、1.75GB RAM。1 時間あたりの[価格](https://azure.microsoft.com/pricing/details/app-service/linux/)
 - Azure OpenAI: Standard Tier、ChatGPT、Ada モデル。使用された 1K トークンあたりの価格、および 1 問あたり少なくとも 1K トークンが使用されます。[価格](https://azure.microsoft.com/pricing/details/cognitive-services/openai-service/)
 - Form Recognizer: S0(Standard) Tier は、あらかじめ構築されたレイアウトを使用します。価格はドキュメント ページあたりの課金です。[価格](https://azure.microsoft.com/pricing/details/form-recognizer/)
-- Azure Cognitive Search: Basic Tier, 1 レプリカ、無料レベルのセマンティック検索。1 時間あたりの[価格](https://azure.microsoft.com/pricing/details/search/)
+- Azure Cognitive Search: Standard Tier, 1 レプリカ、無料レベルのセマンティック検索。1 時間あたりの[価格](https://azure.microsoft.com/pricing/details/search/)
 - Azure Blob Storage: Standard Tier LRS（ローカル冗長）。ストレージと読み取り操作ごとの価格。[価格](https://azure.microsoft.com/pricing/details/storage/blobs/)
 - Azure Monitor: 従量課金制。費用は、取り込んだデータに基づいて計算されます。[価格](https://azure.microsoft.com/pricing/details/monitor/)
 
@@ -78,6 +78,13 @@
   * **重要**: PowerShell コマンドから `pwsh.exe` を実行できることを確認します。失敗した場合は、PowerShell をアップグレードする必要があります。
 
 >NOTE: Azure アカウントには、[User Access Administrator](https://learn.microsoft.com/azure/role-based-access-control/built-in-roles#user-access-administrator) または [Owner](https://learn.microsoft.com/azure/role-based-access-control/built-in-roles#owner) などの `Microsoft.Authorization/roleAssignments/write` 権限が必要です。
+
+#### GitHub Codespaces または VS Code Remote Containers で実行する場合
+
+GitHub Codespaces または VS Code Remote Containers を使えば、このレポジトリを仮想的に実行できます。以下のボタンのいずれかをクリックして、これらのオプションのいずれかでこのレポジトリを開いてください。
+
+[![Open in GitHub Codespaces](https://img.shields.io/static/v1?style=for-the-badge&label=GitHub+Codespaces&message=Open&color=brightgreen&logo=github)](https://github.com/codespaces/new?hide_repo_select=true&ref=main&repo=599293758&machine=standardLinux32gb&devcontainer_path=.devcontainer%2Fdevcontainer.json&location=WestUs2)
+[![Open in Remote - Containers](https://img.shields.io/static/v1?style=for-the-badge&label=Remote%20-%20Containers&message=Open&color=blue&logo=visualstudiocode)](https://vscode.dev/redirect?url=vscode://ms-vscode-remote.remote-containers/cloneInVolume?url=https://github.com/azure-samples/azure-search-openai-demo)
 
 ### 新規でデプロイする
 
@@ -166,13 +173,6 @@ Application Insights と各リクエストのトレース、エラーのログ�
 デフォルトでは、デプロイされた Azure Web アプリは認証やアクセス制限が有効になっておらず、Web アプリへのルーティング可能なネットワーク アクセスがあれば、誰でもインデックス化されたデータとチャットできることになります。[Azure App Service で実行されている Web アプリにアプリの認証を追加する](https://learn.microsoft.com/azure/app-service/scenario-secure-app-authentication-app-service)チュートリアルに従って Azure Active Directory への認証を要求し、デプロイされた Web アプリに対してそれを設定することができます。
 
 その後、特定のユーザーまたはグループへのアクセスを制限するには、[Azure AD アプリを Azure AD テナントの一連のユーザーに制限する](https://learn.microsoft.com/azure/active-directory/develop/howto-restrict-your-app-to-a-set-of-users) の手順に従って、Enterprise Application の下の "Assignment Required?" オプションを変更し、ユーザー/グループへのアクセスを割り当てます。 明示的にアクセス権が付与されていないユーザーには、「AADSTS50105: Your administrator has configured the application <app_name> to block users unless they are specifically granted ('assigned') access to the application.」というエラーメッセージが表示されます。
-
-### GitHub Codespaces または VS Code Remote Containers で実行する場合
-
-GitHub Codespaces または VS Code Remote Containers を使えば、このレポジトリを仮想的に実行できます。以下のボタンのいずれかをクリックして、これらのオプションのいずれかでこのレポジトリを開いてください。
-
-[![Open in GitHub Codespaces](https://img.shields.io/static/v1?style=for-the-badge&label=GitHub+Codespaces&message=Open&color=brightgreen&logo=github)](https://github.com/codespaces/new?hide_repo_select=true&ref=main&repo=599293758&machine=standardLinux32gb&devcontainer_path=.devcontainer%2Fdevcontainer.json&location=WestUs2)
-[![Open in Remote - Containers](https://img.shields.io/static/v1?style=for-the-badge&label=Remote%20-%20Containers&message=Open&color=blue&logo=visualstudiocode)](https://vscode.dev/redirect?url=vscode://ms-vscode-remote.remote-containers/cloneInVolume?url=https://github.com/azure-samples/azure-search-openai-demo)
 
 ## Resources
 

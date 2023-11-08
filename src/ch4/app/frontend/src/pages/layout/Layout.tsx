@@ -16,12 +16,12 @@ const Layout = () => {
                         <ul className={styles.headerNavList}>
                             <li>
                                 <NavLink to="/" className={({ isActive }) => (isActive ? styles.headerNavPageLinkActive : styles.headerNavPageLink)}>
-                                    Chat
+                                    チャット
                                 </NavLink>
                             </li>
                             <li className={styles.headerNavLeftMargin}>
                                 <NavLink to="/qa" className={({ isActive }) => (isActive ? styles.headerNavPageLinkActive : styles.headerNavPageLink)}>
-                                    Ask a question
+                                    一問一答
                                 </NavLink>
                             </li>
                             <li className={styles.headerNavLeftMargin}>

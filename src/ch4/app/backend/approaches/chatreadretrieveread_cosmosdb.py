@@ -1,18 +1,18 @@
-from typing import Any
+import logging
+import uuid
+from datetime import datetime
+from typing import Any, AsyncGenerator
 
 import openai
 from azure.search.documents.aio import SearchClient
 from azure.search.documents.models import QueryType
 
-from approaches.approach import ChatApproach
 from core.messagebuilder import MessageBuilder
 from core.modelhelper import get_token_limit
 from text import nonewlines
-from azure.cosmos import CosmosClient, PartitionKey
-import uuid
-from datetime import datetime
 
-class ChatReadRetrieveReadApproachCosmosDB(ChatApproach):
+
+class ChatReadRetrieveReadApproachCosmosDB:
     # Chat roles
     SYSTEM = "system"
     USER = "user"
@@ -83,9 +83,9 @@ If you cannot generate a search query, return only the number 0.
         self.chatgpt_token_limit = get_token_limit(chatgpt_model)
         self.cosmos_container = cosmos_container
         self.chat_session_id = str(uuid.uuid4())
-        print(self.chatgpt_token_limit, chatgpt_model)
+        logging.info(self.chatgpt_token_limit, chatgpt_model)
 
-    async def run(self, history: list[dict[str, str]], overrides: dict[str, Any]) -> Any:
+    async def run_until_final_call(self, history: list[dict[str, str]], overrides: dict[str, Any], should_stream: bool = False) -> tuple:
         has_text = overrides.get("retrieval_mode") in ["text", "hybrid", None]
         has_vector = overrides.get("retrieval_mode") in ["vectors", "hybrid", None]
         use_semantic_captions = True if overrides.get("semantic_captions") and has_text else False
@@ -115,11 +115,11 @@ If you cannot generate a search query, return only the number 0.
             n=1)
 
         query_text = chat_completion.choices[0].message.content
-        print(query_text)
+        logging.info(query_text)
         if query_text.strip() == "0":
             # Use the last user input if we failed to generate a better query
             # より良いクエリを生成できなかった場合は、最後に入力されたクエリを使用する。
-            query_text = history[-1]["user"] 
+            query_text = history[-1]["user"]
 
         # STEP 2: Retrieve relevant documents from the search index with the GPT optimized query
         # GPTで最適化されたクエリを使用して、検索インデックスから関連するドキュメントを取得します。
@@ -128,7 +128,7 @@ If you cannot generate a search query, return only the number 0.
         # 検索モードにベクトルが含まれている場合は、クエリの埋め込みを計算します。
         if has_vector:
             # ユーザーの入力をそのままベクトル化するアプローチも無くはない
-            # query_text = history[-1]["user"] 
+            # query_text = history[-1]["user"]
 
             query_vector = (await openai.Embedding.acreate(engine=self.embedding_deployment, input=query_text))["data"][0]["embedding"]
         else:
@@ -197,7 +197,7 @@ If you cannot generate a search query, return only the number 0.
             n=1)
 
         chat_content = chat_completion.choices[0].message.content
-        print(chat_content)
+        logging.info(chat_content)
         msg_to_display = '\n\n'.join([str(message) for message in messages])
 
         # STEP 4: Store the chat history and answer in Cosmos DB
@@ -215,10 +215,22 @@ If you cannot generate a search query, return only the number 0.
         try:
             self.cosmos_container.create_item(new_item)
         except Exception as e:
-            print(e)
+            logging.exception(e)
             pass
 
         return {"data_points": results, "answer": chat_content, "thoughts": f"Searched for:<br>{query_text}<br><br>Conversations:<br>" + msg_to_display.replace('\n', '<br>')}
+
+    async def run_without_streaming(self, history: list[dict[str, str]], overrides: dict[str, Any]) -> dict[str, Any]:
+        extra_info, chat_coroutine = await self.run_until_final_call(history, overrides, should_stream=False)
+        chat_content = (await chat_coroutine).choices[0].message.content
+        extra_info["answer"] = chat_content
+        return extra_info
+
+    async def run_with_streaming(self, history: list[dict[str, str]], overrides: dict[str, Any]) -> AsyncGenerator[dict, None]:
+        extra_info, chat_coroutine = await self.run_until_final_call(history, overrides, should_stream=True)
+        yield extra_info
+        async for event in await chat_coroutine:
+            yield event
 
     def get_messages_from_history(self, system_prompt: str, model_id: str, history: list[dict[str, str]], user_conv: str, few_shots = [], max_tokens: int = 4096) -> list:
         message_builder = MessageBuilder(system_prompt, model_id)

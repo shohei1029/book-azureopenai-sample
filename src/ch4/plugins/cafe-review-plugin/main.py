@@ -1,8 +1,10 @@
 import json
+import logging
 
 import quart
 import quart_cors
 from quart import request
+
 app = quart_cors.cors(quart.Quart(__name__), allow_origin="https://chat.openai.com")
 
 # Keep track of reviews. Does not persist if Python session is restarted.
@@ -17,7 +19,7 @@ async def get_reviews(username):
 async def search():
 
     query = request.args.get("q")
-    print(query)
+    logging.info(query)
     list_rest = [{"bushoname": "源範頼", "cafename": "カフェかば殿", "rating": 4.1, "area": "修善寺"},
                 {"bushoname": "源頼朝", "cafename": "源氏庵", "rating": 3.6, "area": "鎌倉"},
                 {"bushoname": "源実朝", "cafename": "カフェ十三人", "rating": 3.5, "area": "修善寺"}]
@@ -36,14 +38,14 @@ async def plugin_logo():
 
 @app.get("/.well-known/ai-plugin.json")
 async def plugin_manifest():
-    host = request.headers['Host']
+    request.headers['Host']
     with open("./.well-known/ai-plugin.json") as f:
         text = f.read()
         return quart.Response(text, mimetype="text/json")
 
 @app.get("/openapi.yaml")
 async def openapi_spec():
-    host = request.headers['Host']
+    request.headers['Host']
     with open("openapi.yaml") as f:
         text = f.read()
         return quart.Response(text, mimetype="text/yaml")
