@@ -1,23 +1,16 @@
-from flask import Flask, render_template, request, jsonify
+import os, flask
+from openai import AzureOpenAI
+from flask import Flask, render_template, request
 from dotenv import load_dotenv
-from langchain.llms import OpenAI
-from langchain.chat_models import ChatOpenAI
-from langchain.chat_models import AzureChatOpenAI
-from langchain.callbacks.base import BaseCallbackHandler
-from langchain.schema import (
-    HumanMessage,
-    SystemMessage
-)
-
-from queue import Queue
-import flask
-import os
-import threading
-import json
-import openai
 
 load_dotenv()
 app = Flask(__name__)
+
+client = AzureOpenAI(
+  azure_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT"), 
+  api_key=os.getenv("AZURE_OPENAI_KEY"),  
+  api_version=os.getenv("AZURE_OPENAI_VERSION")
+)
 
 @app.route('/')
 def index():
@@ -25,46 +18,24 @@ def index():
 
 @app.route('/chat')
 def chat():
-    queue_obj = Queue()
     prompt = request.args.get("prompt")
-
-    def askQuestion():
-        class StreamCallbackHandler(BaseCallbackHandler):
-            def on_llm_new_token(self, token: str, **kwargs):
-                queue_obj.put(token)
-            def on_llm_end(self, response, **kwargs):
-                queue_obj.put('[DONE]')
-
-        chat = AzureChatOpenAI(
-            deployment_name=os.getenv('AZURE_DEPLOYMENT_ID'),
-            openai_api_type=os.getenv('OPENAI_API_TYPE'),
-            openai_api_base=os.getenv('AZURE_OPENAI_ENDPOINT'),
-            openai_api_version=os.getenv('AZURE_OPENAI_VERSION'),
-            openai_api_key=os.getenv('AZURE_OPENAI_KEY'),
-            temperature=os.getenv('OPENAI_TEMPERATURE'),
-            streaming=True,
-            callbacks=[StreamCallbackHandler()]
-        )
-
-        messages = [
-            SystemMessage(content="")
-        ]
-
-        messages.append(HumanMessage(content=prompt))
-        chat(messages)
+    response = client.chat.completions.create(
+        model=os.getenv("AZURE_DEPLOYMENT_ID"),
+        messages=[
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": prompt},
+        ],
+        stream=True
+    )
 
     def stream():
-        str = ''
-        while (True):
-            chunk = queue_obj.get()
-            if chunk:
-                if chunk == '[DONE]':
-                    yield 'data: %s\n\n' % '[DONE]'
-                    break
-                else:
-                    str += chunk
-                    yield 'data: %s\n\n' % chunk
-    threading.Thread(target=askQuestion).start()
+        for chunk in response:
+            finish_reason = chunk.choices[0].finish_reason
+            if finish_reason == 'stop':
+                yield 'data: %s\n\n' % '[DONE]'
+            else:
+                delta = chunk.choices[0].delta.content or ""
+                yield 'data: %s\n\n' % delta.replace('\n', '[NEWLINE]')
     return flask.Response(stream(), mimetype='text/event-stream')
 
 if __name__ == "__main__":
