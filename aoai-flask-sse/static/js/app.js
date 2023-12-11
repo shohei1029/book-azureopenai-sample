@@ -1,59 +1,54 @@
-let source;
-// DEFINE HELPER FUNCTIONS
+const form = g('form');
+const keyword = g('keyword');
+const content = g('content');
+let CHAT_ID;
+
 function g(id) {
-  return document.getElementById(id);
-}
-
-function replaceURLWithHTMLLinks(text) {
-  var exp =
-    /(\b(https?|ftp|file):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/i;
-  return text.replace(exp, "<a target=\"_blank\" href='$1'>$1</a>");
-}
-
-function sendPrompt(prompt) {
-  response.innerHTML = "";
-  keyword.value = "";
-  keyword.placeholder = "処理中...";
-  keyword.disabled = true;
-  source = new EventSource(`/chat?prompt=${prompt}`);
-  source.onmessage = function (event) {
-    if (event.data === "[DONE]") {
-      source.close();
-    }
-    insertAnswer(event.data, prompt);
-  };
+    return document.getElementById(id);
 }
 
 function reset() {
-  keyword.placeholder = "Ask me anything...";
-  keyword.disabled = false;
-  keyword.focus();
+    keyword.value = '';
 }
 
-function insertAnswer(answer, prompt) {
-  if (answer === "[DONE]") {
+function scorllToBottom() {
+    content.scrollTo(0, content.scrollHeight);
+}
+
+function onSubmit(event) {
+    event.preventDefault();
+    const prompt = keyword.value;
+    CHAT_ID = Date.now();
+    updateDOM('user', prompt);
+    invokeAPI(keyword.value)
     reset();
-    response.innerHTML = replaceURLWithHTMLLinks(response.innerHTML);
-    return;
-  }
-  const card = response;
-  if (card) {
-    card.innerText += answer;
-  } else {
-    let html = `${answer}`;
-    response.insertAdjacentHTML("beforeend", html);
-  }
+    return false;
 }
 
-// DEFINE DOM ELEMENTS
-const response = g("response");
-const keyword = g("keyword");
+function invokeAPI(prompt) {
+    const source = new EventSource(`/chat?prompt=${prompt}`);
+    source.onmessage = function (event) {
+        if (event.data === "[DONE]") {
+            source.close();
+        }
+        updateDOM('ai', event.data);
+      };
+}
 
-keyword.addEventListener("keydown", (e) => {
-  if (e.keyCode == 13) {
-    const prompt = keyword.value.trim();
-    if (prompt) {
-      sendPrompt(prompt);
+function updateDOM(type, text) {
+    let html = '';
+    if (type === 'user') {
+        html = `<div class="card question">${text}</div>`;
+    } else if (type === 'ai' && text !== '[DONE]') {
+        const card = g(CHAT_ID);
+        if (card) {
+            card.innerText += text.replaceAll('[NEWLINE]', '\n');
+        } else {
+            html = `<div class="card answer" id="${CHAT_ID}">${text}</div>`;
+        }
     }
-  }
-});
+    content.insertAdjacentHTML("beforeend", html);
+    scorllToBottom();
+}
+
+form.addEventListener('submit', onSubmit);

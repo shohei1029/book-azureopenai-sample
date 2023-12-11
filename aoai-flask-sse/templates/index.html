@@ -2,26 +2,25 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>TEST</title>
+    <title>Azure OpenAI Demo</title>
+    <link rel="stylesheet" href="static/css/app.css" />
   </head>
   <body>
-    <div id="app">
-      <div class="header" id="header">
-        <div class="tip" id="tip">
-          <div class="box">質問</div>
-        </div>
+    <div class="app">
+      <div class="chat">
+        <div class="content" id="content"></div>
+        <form class="form" id="form">
+          <div class="form-control">
+            <input
+              type="text"
+              id="keyword"
+              class="input"
+              placeholder="何でも聞いてください..."
+            />
+          </div>
+        </form>
       </div>
-      <div id="chat-body">
-        <input
-          type="text"
-          placeholder="Ask me anything..."
-          id="keyword"
-          autocomplete="off"
-        />
-      </div>
-      <div class="" id="response"></div>
     </div>
     <script src="static/js/app.js"></script>
   </body>
