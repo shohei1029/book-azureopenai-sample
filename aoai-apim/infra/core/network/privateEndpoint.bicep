@@ -81,6 +81,21 @@ resource privateDnsZoneGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneG
   }
 }
 
+resource privateDnsZoneGroup2 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2023-04-01' = {
+  parent: privateEndpoint2
+  name: privateDnsZone.name
+  properties: {
+    privateDnsZoneConfigs: [
+      {
+        name: 'private-link-${name}-2'
+        properties: {
+          privateDnsZoneId: privateDnsZone.id
+        }
+      }
+    ]
+  }
+}
+
 output privateEndpointId1 string = privateEndpoint1.id
 output privateEndpointName1 string = privateEndpoint1.name
 output privateEndpointId2 string = privateEndpoint2.id

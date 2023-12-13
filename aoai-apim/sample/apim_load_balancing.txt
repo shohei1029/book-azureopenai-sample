@@ -1,0 +1,18 @@
+        <set-variable name="urlId" value="@(new Random(context.RequestId.GetHashCode()).Next(1, 101))" />
+        <choose>
+            <when condition="@(context.Variables.GetValueOrDefault<int>("urlId") < 51)">
+                <set-backend-service base-url="{{backend-url-1}}" />
+            </when>
+            <when condition="@(context.Variables.GetValueOrDefault<int>("urlId") > 50)">
+                <set-backend-service base-url="{{backend-url-2}}" />
+            </when>
+            <otherwise>
+                <return-response>
+                    <set-status code="500" reason="InternalServerError" />
+                    <set-header name="Microsoft-Azure-Api-Management-Correlation-Id" exists-action="override">
+                        <value>@{return Guid.NewGuid().ToString();}</value>
+                    </set-header>
+                    <set-body>A gateway-related error occurred while processing the request.</set-body>
+                </return-response>
+            </otherwise>
+        </choose>

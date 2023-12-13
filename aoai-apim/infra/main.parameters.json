@@ -8,10 +8,12 @@
     "location": {
       "value": "${AZURE_LOCATION}"
     },
+    "aoaiFirstLocation": {
+      "value": "japaneast"
+    },
     "aoaiSecondLocation": {
       "value": "eastus"
     },
-
     "corsOriginUrl": {
       "value": "*"
     },

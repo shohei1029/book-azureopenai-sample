@@ -6,7 +6,7 @@ import os
 import json
 import requests
 
-def create_app(tenant_id, client_id, client_secret, redirect_uri, scope, endpoint, subscription_key):
+def create_app(tenant_id, client_id, client_secret, redirect_uri, scope, apim_name, subscription_key):
     app = Flask(__name__)
     app.secret_key = 'random_secret'
     oauth = OAuth(app)
@@ -51,7 +51,8 @@ def create_app(tenant_id, client_id, client_secret, redirect_uri, scope, endpoin
             }]
         }
 
-        response = requests.post(endpoint, headers=headers, json=data)
+        response = requests.post("https://" + apim_name + ".azure-api.net/api/deployments/chatgpt/chat/completions?api-version=2023-07-01-preview"
+                                , headers=headers, json=data)
         return jsonify(response.json())
 
     return app
@@ -63,10 +64,10 @@ if __name__ == '__main__':
     parser.add_argument("--client_secret", required=True)
     parser.add_argument("--redirect_uri", required=True)
     parser.add_argument("--scope", required=True)
-    parser.add_argument("--endpoint", required=True)
+    parser.add_argument("--apim_name", required=True)
     parser.add_argument("--subscription_key", required=True)
 
     args = parser.parse_args()
 
-    app = create_app(args.tenant_id, args.client_id, args.client_secret, args.redirect_uri, args.scope, args.endpoint, args.subscription_key)
+    app = create_app(args.tenant_id, args.client_id, args.client_secret, args.redirect_uri, args.scope, args.apim_name, args.subscription_key)
     app.run()

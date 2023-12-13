@@ -43,6 +43,8 @@ param subnetAddressPrefix1 string = '10.0.0.0/24'
 param subnetAddressPrefix2 string = '10.0.1.0/24'
 
 // params for api policy settings
+@description('1つめのAzire OpenAIのリージョンを指定してください')
+param aoaiFirstLocation string = 'xxxx'
 @description('2つめのAzire OpenAIのリージョンを指定してください')
 param aoaiSecondLocation string = 'xxxx'
 @description('CORSオリジンとして許可するドメインを指定してください(*でも可)')
@@ -76,7 +78,7 @@ module openAi1 'core/ai/cognitiveservices.bicep' = {
   scope: openAiResourceGroup
   params: {
     name: !empty(openAiServiceName) ? openAiServiceName : '${abbrs.cognitiveServicesAccounts}${resourceToken}-1'
-    location: openAiResourceGroupLocation
+    location: aoaiFirstLocation
     tags: tags
     sku: {
       name: openAiSkuName

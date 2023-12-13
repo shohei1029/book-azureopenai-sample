@@ -1,0 +1,4 @@
+// Azure API Managementの診断ログをLog Analyticsに出力するためのクエリ
+// between (datetime("<開始日時>") .. datetime("<終了日時>")) を指定して実行してください
+ApiManagementGatewayLogs
+| where TimeGenerated between (datetime("2023-09-01T00:00:00") .. datetime("2023-09-30T23:59:59"))

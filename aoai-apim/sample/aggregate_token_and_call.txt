@@ -1,0 +1,16 @@
+// Azure API Managementのサブスクリプションキー、モデルやユーザごとに利用トークン数やAPI実行数を算出するクエリ
+// between (datetime("<開始日時>") .. datetime("<終了日時>")) を指定して実行してください
+ApiManagementGatewayLogs
+| where TimeGenerated between (datetime("2023-10-01T00:00:00") .. datetime("2023-10-29T23:59:59"))
+  and OperationId in ('ChatCompletions_Create', 'completions_create', 'embeddings_create')
+  and IsRequestSuccess == true
+| extend model_name = tostring(parse_json(BackendResponseBody)['model'])
+| extend prompttokens = parse_json(parse_json(BackendResponseBody)['usage'])['prompt_tokens']
+| extend completiontokens = parse_json(parse_json(BackendResponseBody)['usage'])['completion_tokens']
+| extend apim_subscription_id =  ApimSubscriptionId
+| extend user_name = tostring(parse_json(parse_json(TraceRecords)[0]['message']))
+| summarize
+    prompt_tokens = sum(todecimal(prompttokens)),
+    completion_tokens = sum(todecimal(completiontokens)),
+    api_call_count = count()
+    by apim_subscription_id, model_name, user_name

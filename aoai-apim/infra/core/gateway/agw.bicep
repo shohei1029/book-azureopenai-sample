@@ -139,7 +139,7 @@ resource agwService 'Microsoft.Network/applicationGateways@2023-05-01' = {
         name: 'https'
         properties: {
           protocol: 'Https'
-          path: '/'
+          path: '/status-0123456789abcdef'
           interval: 30
           timeout: 30
           unhealthyThreshold: 3
@@ -148,7 +148,6 @@ resource agwService 'Microsoft.Network/applicationGateways@2023-05-01' = {
           match: {
             statusCodes: [
               '200-399'
-              '404'
             ]
           }
         }
