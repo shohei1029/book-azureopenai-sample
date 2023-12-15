@@ -1,13 +1,14 @@
 from typing import Any
 
-import openai
+from openai import AsyncOpenAI
 from azure.search.documents.aio import SearchClient
-from azure.search.documents.models import QueryType
-
+from azure.search.documents.models import (
+    QueryType,
+    VectorizedQuery
+)
 from approaches.approach import AskApproach
 from core.messagebuilder import MessageBuilder
 from text import nonewlines
-
 
 class RetrieveThenReadApproach(AskApproach):
     """
@@ -37,8 +38,9 @@ info4.pdf: 平氏追討を名目にした軍事的支配権の行使を通じて
 """
     answer = "源頼朝は、御家人の所領の保証、敵方の没収所領の給付を行い、「本領安堵」「新恩給付」という豪族たちの最大の願望を実現し、坂東豪族の支持を集めた。[info1.txt][info3.pdf]  また、平氏追討を名目にした軍事的支配権の行使を通じて、鎌倉政権を確立し、[info4.txt] 守護地頭という重要な政策を確立しました。[info2.txt]"
 
-    def __init__(self, search_client: SearchClient, openai_deployment: str, chatgpt_model: str, embedding_deployment: str, sourcepage_field: str, content_field: str):
+    def __init__(self, search_client: SearchClient, openai_client: AsyncOpenAI, openai_deployment: str, chatgpt_model: str, embedding_deployment: str, sourcepage_field: str, content_field: str):
         self.search_client = search_client
+        self.openai_client = openai_client
         self.openai_deployment = openai_deployment
         self.chatgpt_model = chatgpt_model
         self.embedding_deployment = embedding_deployment
@@ -55,7 +57,11 @@ info4.pdf: 平氏追討を名目にした軍事的支配権の行使を通じて
 
         # If retrieval mode includes vectors, compute an embedding for the query
         if has_vector:
-            query_vector = (await openai.Embedding.acreate(engine=self.embedding_deployment, input=q))["data"][0]["embedding"]
+            embedding = await self.openai_client.embeddings.create(
+                model=self.embedding_deployment,
+                input=q
+            )
+            query_vector = embedding.data[0].embedding
         else:
             query_vector = None
 
@@ -64,24 +70,18 @@ info4.pdf: 平氏追討を名目にした軍事的支配権の行使を通じて
 
         # Use semantic ranker if requested and if retrieval mode is text or hybrid (vectors + text)
         if overrides.get("semantic_ranker") and has_text:
-            r = await self.search_client.search(query_text,
+            r = await self.search_client.search(search_text=query_text,
                                           filter=filter,
                                           query_type=QueryType.SEMANTIC,
-                                          query_language="ja-jp",
-                                          query_speller="none",
                                           semantic_configuration_name="default",
                                           top=top,
                                           query_caption="extractive|highlight-false" if use_semantic_captions else None,
-                                          vector=query_vector,
-                                          top_k=50 if query_vector else None,
-                                          vector_fields="embedding" if query_vector else None)
+                                          vector_queries=[VectorizedQuery(vector=query_vector, k_nearest_neighbors=top, fields="embedding")] if query_vector else None)
         else:
-            r = await self.search_client.search(query_text,
+            r = await self.search_client.search(search_text=query_text,
                                           filter=filter,
                                           top=top,
-                                          vector=query_vector,
-                                          top_k=50 if query_vector else None,
-                                          vector_fields="embedding" if query_vector else None)
+                                          vector_queries=[VectorizedQuery(vector=query_vector, k_nearest_neighbors=top, fields="embedding")] if query_vector else None)
         if use_semantic_captions:
             results = [doc[self.sourcepage_field] + ": " + nonewlines(" . ".join([c.text for c in doc['@search.captions']])) async for doc in r]
         else:
@@ -99,12 +99,11 @@ info4.pdf: 平氏追討を名目にした軍事的支配権の行使を通じて
         message_builder.append_message('user', self.question)
 
         messages = message_builder.messages
-        chat_completion = await openai.ChatCompletion.acreate(
-            deployment_id=self.openai_deployment,
-            model=self.chatgpt_model,
+        chat_coroutine = self.openai_client.chat.completions.create(
+            model=self.openai_deployment if self.openai_deployment else self.chatgpt_model,
             messages=messages,
             temperature=overrides.get("temperature") or 0.3,
             max_tokens=1024,
-            n=1)
-
-        return {"data_points": results, "answer": chat_completion.choices[0].message.content, "thoughts": f"Question:<br>{query_text}<br><br>Prompt:<br>" + '\n\n'.join([str(message) for message in messages])}
+            n=1
+        )
+        return {"data_points": results, "answer": (await chat_coroutine).choices[0].message.content, "thoughts": f"Question:<br>{query_text}<br><br>Prompt:<br>" + '\n\n'.join([str(message) for message in messages])}

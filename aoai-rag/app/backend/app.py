@@ -7,10 +7,10 @@ import time
 from typing import AsyncGenerator
 
 import aiohttp
-import openai
+from openai import APIError, AsyncAzureOpenAI, AsyncOpenAI
 
-#Cosmos DB
-from azure.identity.aio import DefaultAzureCredential
+from azure.cosmos import CosmosClient, PartitionKey
+from azure.identity.aio import DefaultAzureCredential, get_bearer_token_provider
 from azure.monitor.opentelemetry import configure_azure_monitor
 from azure.search.documents.aio import SearchClient
 from azure.storage.blob.aio import BlobServiceClient
@@ -32,6 +32,7 @@ from approaches.chatreadretrieveread import ChatReadRetrieveReadApproach
 from approaches.readpluginsretrieve import ReadPluginsRetrieve
 from approaches.readretrieveread import ReadRetrieveReadApproach
 from approaches.retrievethenread import RetrieveThenReadApproach
+from approaches.chatreadretrieveread_cosmosdb import ChatReadRetrieveReadApproachCosmosDB
 
 # Replace these with your own values, either in environment variables or directly here
 AZURE_STORAGE_ACCOUNT = os.getenv("AZURE_STORAGE_ACCOUNT", "mystorageaccount")
@@ -53,7 +54,8 @@ CONFIG_CREDENTIAL = "azure_credential"
 CONFIG_ASK_APPROACHES = "ask_approaches"
 CONFIG_CHAT_APPROACHES = "chat_approaches"
 CONFIG_BLOB_CLIENT = "blob_client"
-
+CONFIG_SEARCH_CLIENT = "search_client"
+CONFIG_OPENAI_CLIENT = "openai_client"
 APPLICATIONINSIGHTS_CONNECTION_STRING = os.getenv("APPLICATIONINSIGHTS_CONNECTION_STRING")
 
 bp = Blueprint("routes", __name__, static_folder='static')
@@ -103,12 +105,7 @@ async def ask():
         impl = current_app.config[CONFIG_ASK_APPROACHES].get(approach)
         if not impl:
             return jsonify({"error": "unknown approach"}), 400
-        #plugin の場合、非同期だと失敗するので同期で実行
-        if approach == "rpr":
-            r = impl.run(request_json["question"], request_json.get("overrides") or {})
-            logging.info("ReadPluginsRetrieve is completed.")
-        else:
-            r = await impl.run(request_json["question"], request_json.get("overrides") or {})
+        r = await impl.run(request_json["question"], request_json.get("overrides") or {})
         return jsonify(r)
     except Exception as e:
         logging.exception("Exception in /ask")
@@ -124,10 +121,7 @@ async def chat():
         impl = current_app.config[CONFIG_CHAT_APPROACHES].get(approach)
         if not impl:
             return jsonify({"error": "unknown approach"}), 400
-        # Workaround for: https://github.com/openai/openai-python/issues/371
-        async with aiohttp.ClientSession() as s:
-            openai.aiosession.set(s)
-            r = await impl.run_without_streaming(request_json["history"], request_json.get("overrides", {}))
+        r = await impl.run_without_streaming(request_json["history"], request_json.get("overrides", {}))
         return jsonify(r)
     except Exception as e:
         logging.exception("Exception in /chat")
@@ -156,14 +150,13 @@ async def chat_stream():
         logging.exception("Exception in /chat")
         return jsonify({"error": str(e)}), 500
 
-
-@bp.before_request
-async def ensure_openai_token():
-    openai_token = current_app.config[CONFIG_OPENAI_TOKEN]
-    if openai_token.expires_on < time.time() + 60:
-        openai_token = await current_app.config[CONFIG_CREDENTIAL].get_token("https://cognitiveservices.azure.com/.default")
-        current_app.config[CONFIG_OPENAI_TOKEN] = openai_token
-        openai.api_key = openai_token.token
+# @bp.before_request
+# async def ensure_openai_token():
+#     openai_token = current_app.config[CONFIG_OPENAI_TOKEN]
+#     if openai_token.expires_on < time.time() + 60:
+#         openai_token = await current_app.config[CONFIG_CREDENTIAL].get_token("https://cognitiveservices.azure.com/.default")
+#         current_app.config[CONFIG_OPENAI_TOKEN] = openai_token
+#         openai.api_key = openai_token.token
 
 @bp.before_app_serving
 async def setup_clients():
@@ -202,25 +195,28 @@ async def setup_clients():
     #     pass
 
     # Used by the OpenAI SDK
-    openai.api_base = f"https://{AZURE_OPENAI_SERVICE}.openai.azure.com"
-    openai.api_version = "2023-07-01-preview"
-    openai.api_type = "azure_ad"
-    openai_token = await azure_credential.get_token(
-        "https://cognitiveservices.azure.com/.default"
-    )
-    openai.api_key = openai_token.token
+    AZURE_OPENAI_API_VERSION = "2023-07-01-preview"
+    AZURE_OPENAI_API_ENDPOINT = f"https://{AZURE_OPENAI_SERVICE}.openai.azure.com"
+    token_provider = get_bearer_token_provider(azure_credential, "https://cognitiveservices.azure.com/.default")
 
     # Store on app.config for later use inside requests
-    current_app.config[CONFIG_OPENAI_TOKEN] = openai_token
+    openai_client = AsyncAzureOpenAI(
+        api_version=AZURE_OPENAI_API_VERSION,
+        azure_endpoint = AZURE_OPENAI_API_ENDPOINT,
+        azure_ad_token_provider = token_provider,
+    )
+    # Store on app.config for later use inside requests
+    current_app.config[CONFIG_OPENAI_TOKEN] = ""#openai_token
     current_app.config[CONFIG_CREDENTIAL] = azure_credential
     current_app.config[CONFIG_BLOB_CLIENT] = blob_client
-    # Various approaches to integrate GPT and external knowledge, most applications will use a single one of these patterns
-    # or some derivative, here we include several for exploration purposes
+    current_app.config[CONFIG_OPENAI_CLIENT] = openai_client
+    current_app.config[CONFIG_SEARCH_CLIENT] = search_client
     # GPTと外部の知識を統合するための様々なアプローチ。ほとんどのアプリケーションは、これらのパターンのうちの1つ、あるいは派生したものを使うでしょう。
     # このサンプルでは ReadDecomposeAsk 機能は ChatGPT プラグイン機能に代替しました。
     current_app.config[CONFIG_ASK_APPROACHES] = {
         "rtr": RetrieveThenReadApproach(
             search_client,
+            openai_client,
             AZURE_OPENAI_CHATGPT_DEPLOYMENT,
             AZURE_OPENAI_CHATGPT_MODEL,
             AZURE_OPENAI_EMB_DEPLOYMENT,
@@ -229,18 +225,26 @@ async def setup_clients():
         ),
         "rrr": ReadRetrieveReadApproach(
             search_client,
+            openai_client,
+            AZURE_OPENAI_API_VERSION,
+            AZURE_OPENAI_API_ENDPOINT,
+            token_provider,
             AZURE_OPENAI_CHATGPT_DEPLOYMENT,
             AZURE_OPENAI_EMB_DEPLOYMENT,
             KB_FIELDS_SOURCEPAGE,
             KB_FIELDS_CONTENT
         ),
         "rpr": ReadPluginsRetrieve(
-            AZURE_OPENAI_CHATGPT_DEPLOYMENT
+            AZURE_OPENAI_CHATGPT_DEPLOYMENT,
+            AZURE_OPENAI_API_VERSION,
+            AZURE_OPENAI_API_ENDPOINT,
+            token_provider
         )
     }
     current_app.config[CONFIG_CHAT_APPROACHES] = {
         "rrr": ChatReadRetrieveReadApproach(
             search_client,
+            openai_client,
             AZURE_OPENAI_CHATGPT_DEPLOYMENT,
             AZURE_OPENAI_CHATGPT_MODEL,
             AZURE_OPENAI_EMB_DEPLOYMENT,
@@ -249,6 +253,7 @@ async def setup_clients():
         )
         # "rrr": ChatReadRetrieveReadApproachCosmosDB (
         #     search_client,
+        #     openai_client,
         #     cosmos_container,
         #     AZURE_OPENAI_CHATGPT_DEPLOYMENT,
         #     AZURE_OPENAI_CHATGPT_MODEL,
@@ -258,6 +263,11 @@ async def setup_clients():
         # )
     }
 
+@bp.after_app_serving
+async def close_clients():
+    await current_app.config[CONFIG_SEARCH_CLIENT].close()
+    await current_app.config[CONFIG_OPENAI_CLIENT].close()
+    await current_app.config[CONFIG_CREDENTIAL].close()
 
 def create_app():
     if APPLICATIONINSIGHTS_CONNECTION_STRING:

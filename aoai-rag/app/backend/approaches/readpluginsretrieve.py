@@ -1,7 +1,6 @@
 import logging
-from typing import Any
+from typing import Any, Callable
 
-import openai
 from langchain.agents import AgentType, initialize_agent, load_tools
 from langchain.agents.mrkl import prompt
 from langchain.callbacks.manager import CallbackManager
@@ -13,21 +12,24 @@ from langchainadapters import HtmlCallbackHandler
 from requests.exceptions import ConnectionError
 
 class ReadPluginsRetrieve(AskApproach):
-    def __init__(self, openai_deployment: str):
+    def __init__(self, openai_deployment: str, openai_api_version: str, openai_endpoint: str, openai_ad_token: str):
         self.openai_deployment = openai_deployment
-
-    def run(self, q: str, overrides: dict[str, Any]) -> Any:
+        self.openai_api_version = openai_api_version
+        self.openai_endpoint = openai_endpoint
+        self.openai_ad_token = openai_ad_token
+    async def run(self, q: str, overrides: dict[str, Any]) -> Any:
         try:
             cb_handler = HtmlCallbackHandler()
             cb_manager = CallbackManager(handlers=[cb_handler])
 
             #llm = ChatOpenAI(model_name="gpt-4-0613", temperature=0)
-            llm = AzureChatOpenAI(deployment_name=self.openai_deployment,
-                                temperature=0.0,
-                                openai_api_base=openai.api_base,
-                                openai_api_version=openai.api_version,
-                                openai_api_type=openai.api_type,
-                                openai_api_key=openai.api_key)
+            llm = AzureChatOpenAI(azure_deployment=self.openai_deployment,
+                        api_version=self.openai_api_version,
+                        azure_endpoint=self.openai_endpoint,
+                        azure_ad_token_provider= self.openai_ad_token,
+                        temperature=overrides.get("temperature") or 0.0,
+                        )
+
             tools = load_tools(["requests_all"])
             plugin_urls = ["http://localhost:5005/.well-known/ai-plugin.json", "http://localhost:5006/.well-known/ai-plugin.json"]
 
@@ -52,7 +54,9 @@ class ReadPluginsRetrieve(AskApproach):
                                         max_iterations=5,
                                         early_stopping_method="generate")
 
-            result = agent_chain.run(q)
+            #result = agent_chain.run(q)
+            result = await agent_chain.arun(q)
+
         except ConnectionError as e:
             logging.exception(e)
             result = "すみません、わかりません。(ConnectionError)"

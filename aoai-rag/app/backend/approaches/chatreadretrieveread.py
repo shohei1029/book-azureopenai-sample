@@ -1,9 +1,17 @@
 import logging
-from typing import Any, AsyncGenerator
+from typing import Any, AsyncGenerator, Coroutine
 
-import openai
+from openai import AsyncOpenAI, AsyncStream
+from openai.types.chat import (
+    ChatCompletion,
+    ChatCompletionChunk,
+)
+
 from azure.search.documents.aio import SearchClient
-from azure.search.documents.models import QueryType
+from azure.search.documents.models import (
+    QueryType,
+    VectorizedQuery
+)
 
 from core.messagebuilder import MessageBuilder
 from core.modelhelper import get_token_limit
@@ -68,8 +76,9 @@ A:関ヶ原の戦いは、1600年10月21日に美濃国不破郡関ヶ原（岐�
         {'role' : ASSISTANT, 'content' : '徳川家康 人物 武功 業績' }
     ]
 
-    def __init__(self, search_client: SearchClient, chatgpt_deployment: str, chatgpt_model: str, embedding_deployment: str, sourcepage_field: str, content_field: str):
+    def __init__(self, search_client: SearchClient, openai_client: AsyncOpenAI, chatgpt_deployment: str, chatgpt_model: str, embedding_deployment: str, sourcepage_field: str, content_field: str):
         self.search_client = search_client
+        self.openai_client = openai_client
         self.chatgpt_deployment = chatgpt_deployment
         self.chatgpt_model = chatgpt_model
         self.embedding_deployment = embedding_deployment
@@ -77,7 +86,7 @@ A:関ヶ原の戦いは、1600年10月21日に美濃国不破郡関ヶ原（岐�
         self.content_field = content_field
         self.chatgpt_token_limit = get_token_limit(chatgpt_model)
 
-    async def run_until_final_call(self, history: list[dict[str, str]], overrides: dict[str, Any], should_stream: bool = False) -> tuple:
+    async def run_until_final_call(self, history: list[dict[str, str]], overrides: dict[str, Any], should_stream: bool = False) -> tuple[dict[str, Any], Coroutine[Any, Any, AsyncStream[ChatCompletionChunk]]]:
         has_text = overrides.get("retrieval_mode") in ["text", "hybrid", None]
         has_vector = overrides.get("retrieval_mode") in ["vectors", "hybrid", None]
         use_semantic_captions = True if overrides.get("semantic_captions") and has_text else False
@@ -99,10 +108,9 @@ A:関ヶ原の戦いは、1600年10月21日に美濃国不破郡関ヶ原（岐�
             )
         
         # ChatCompletion で検索クエリーを生成する
-        chat_completion = await openai.ChatCompletion.acreate(
-            deployment_id=self.chatgpt_deployment,
-            model=self.chatgpt_model,
+        chat_completion: ChatCompletion = await self.openai_client.chat.completions.create(
             messages=messages,
+            model=self.chatgpt_deployment if self.chatgpt_deployment else self.chatgpt_model,
             temperature=0.0,
             max_tokens=100,
             n=1)
@@ -116,7 +124,11 @@ A:関ヶ原の戦いは、1600年10月21日に美濃国不破郡関ヶ原（岐�
         # ================================================================================
         # 検索モードにベクトルが含まれている場合は、クエリの埋め込みを計算します。
         if has_vector:
-            query_vector = (await openai.Embedding.acreate(engine=self.embedding_deployment, input=query_text))["data"][0]["embedding"]
+            embedding = await self.openai_client.embeddings.create(
+                model=self.embedding_deployment,
+                input=query_text
+            )
+            query_vector = embedding.data[0].embedding
         else:
             query_vector = None
 
@@ -126,24 +138,19 @@ A:関ヶ原の戦いは、1600年10月21日に美濃国不破郡関ヶ原（岐�
 
         # 検索モードがテキストまたはハイブリッド（ベクトル＋テキスト）の場合、リクエストに応じてセマンティックリランカーを使用する。
         if overrides.get("semantic_ranker") and has_text:
-            r = await self.search_client.search(query_text,
+            r = await self.search_client.search(search_text=query_text,
                                           filter=filter,
                                           query_type=QueryType.SEMANTIC,
-                                          query_language="ja-jp",
-                                          query_speller="none",
                                           semantic_configuration_name="default",
                                           top=top,
                                           query_caption="extractive|highlight-false" if use_semantic_captions else None,
-                                          vector=query_vector,
-                                          top_k=50 if query_vector else None,
-                                          vector_fields="embedding" if query_vector else None)
+                                          vector_queries=[VectorizedQuery(vector=query_vector, k_nearest_neighbors=top, fields="embedding")] if query_vector else None)
         else:
-            r = await self.search_client.search(query_text,
+            r = await self.search_client.search(search_text=query_text,
                                           filter=filter,
                                           top=top,
-                                          vector=query_vector,
-                                          top_k=50 if query_vector else None,
-                                          vector_fields="embedding" if query_vector else None)
+                                          vector_queries=[VectorizedQuery(vector=query_vector, k_nearest_neighbors=top, fields="embedding")] if query_vector else None)
+        
         if use_semantic_captions:
             results =[" SOURCE:" + doc[self.sourcepage_field] + ": " + nonewlines(" . ".join([c.text for c in doc['@search.captions']])) async for doc in r]
         else:
@@ -178,14 +185,14 @@ A:関ヶ原の戦いは、1600年10月21日に美濃国不破郡関ヶ原（岐�
         extra_info = {"data_points": results, "thoughts": f"Searched for:<br>{query_text}<br><br>Conversations:<br>" + msg_to_display.replace('\n', '<br>')}
         
         # ChatCompletion で回答を生成する
-        chat_coroutine = openai.ChatCompletion.acreate(
-                deployment_id=self.chatgpt_deployment,
-                model=self.chatgpt_model,
-                messages=messages,
-                temperature=overrides.get("temperature") or 0.0,
-                max_tokens=1024,
-                n=1,
-                stream=should_stream)
+        chat_coroutine = self.openai_client.chat.completions.create(
+            model=self.chatgpt_deployment if self.chatgpt_deployment else self.chatgpt_model,
+            messages=messages,
+            temperature=overrides.get("temperature") or 0.0,
+            max_tokens=1024,
+            n=1,
+            stream=should_stream
+        )
         return (extra_info, chat_coroutine)
 
     async def run_without_streaming(self, history: list[dict[str, str]], overrides: dict[str, Any]) -> dict[str, Any]:
@@ -196,9 +203,24 @@ A:関ヶ原の戦いは、1600年10月21日に美濃国不破郡関ヶ原（岐�
 
     async def run_with_streaming(self, history: list[dict[str, str]], overrides: dict[str, Any]) -> AsyncGenerator[dict, None]:
         extra_info, chat_coroutine = await self.run_until_final_call(history, overrides, should_stream=True)
-        yield extra_info
-        async for event in await chat_coroutine:
-            yield event
+        yield {
+            "choices": [
+                {
+                    "delta": {"role": self.ASSISTANT},
+                    "context": extra_info,
+                    "finish_reason": None,
+                    "index": 0,
+                }
+            ],
+            "object": "chat.completion.chunk",
+        }
+        async for event_chunk in await chat_coroutine:
+            # "2023-07-01-preview" API version has a bug where first response has empty choices
+            event = event_chunk.model_dump()  # Convert pydantic model to dict
+            if event["choices"]:
+                content = event["choices"][0]["delta"].get("content")
+                content = content or ""  # content may either not exist in delta, or explicitly be None
+                yield event
 
     def get_messages_from_history(self, system_prompt: str, model_id: str, history: list[dict[str, str]], user_conv: str, few_shots = [], max_tokens: int = 4096) -> list:
         message_builder = MessageBuilder(system_prompt, model_id)

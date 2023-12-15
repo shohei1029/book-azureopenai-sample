@@ -1,10 +1,12 @@
 import csv
 import logging
-from typing import Any
-
-import openai
+from typing import Any, Callable
 from azure.search.documents.aio import SearchClient
-from azure.search.documents.models import QueryType
+from azure.search.documents.models import (
+    QueryType,
+    VectorizedQuery
+)
+from openai import AsyncOpenAI
 from langchain.agents import (
     AgentType,
     Tool,
@@ -31,8 +33,12 @@ class ReadRetrieveReadApproach(AskApproach):
     [1] E. Karpas, et al. arXiv:2205.00445
     """
 
-    def __init__(self, search_client: SearchClient, openai_deployment: str, embedding_deployment: str, sourcepage_field: str, content_field: str):
+    def __init__(self, search_client: SearchClient, openai_client: AsyncOpenAI, openai_api_version: str, openai_endpoint: str, openai_ad_token: Callable[[], str], openai_deployment: str, embedding_deployment: str, sourcepage_field: str, content_field: str):
         self.search_client = search_client
+        self.openai_client = openai_client
+        self.openai_api_version = openai_api_version
+        self.openai_endpoint = openai_endpoint
+        self.openai_ad_token = openai_ad_token
         self.openai_deployment = openai_deployment
         self.embedding_deployment = embedding_deployment
         self.sourcepage_field = sourcepage_field
@@ -47,7 +53,11 @@ class ReadRetrieveReadApproach(AskApproach):
         filter = "category ne '{}'".format(exclude_category.replace("'", "''")) if exclude_category else None
         # If retrieval mode includes vectors, compute an embedding for the query
         if has_vector:
-            query_vector = (await openai.Embedding.acreate(engine=self.embedding_deployment, input=query_text))["data"][0]["embedding"]
+            embedding = await self.openai_client.embeddings.create(
+                model=self.embedding_deployment,
+                input=query_text
+            )
+            query_vector = embedding.data[0].embedding
         else:
             query_vector = None
 
@@ -57,24 +67,18 @@ class ReadRetrieveReadApproach(AskApproach):
 
         # Use semantic ranker if requested and if retrieval mode is text or hybrid (vectors + text)
         if overrides.get("semantic_ranker") and has_text:
-            r = await self.search_client.search(query_text,
+            r = await self.search_client.search(search_text=query_text,
                                           filter=filter,
                                           query_type=QueryType.SEMANTIC,
-                                          query_language="ja-jp",
-                                          query_speller="none",
                                           semantic_configuration_name="default",
                                           top = top,
                                           query_caption="extractive|highlight-false" if use_semantic_captions else None,
-                                          vector=query_vector,
-                                          top_k=50 if query_vector else None,
-                                          vector_fields="embedding" if query_vector else None)
+                                          vector_queries=[VectorizedQuery(vector=query_vector, k_nearest_neighbors=top, fields="embedding")] if query_vector else None)
         else:
-            r = await self.search_client.search(query_text,
+            r = await self.search_client.search(search_text=query_text,
                                           filter=filter,
                                           top=top,
-                                          vector=query_vector,
-                                          top_k=50 if query_vector else None,
-                                          vector_fields="embedding" if query_vector else None)
+                                          vector_queries=[VectorizedQuery(vector=query_vector, k_nearest_neighbors=top, fields="embedding")] if query_vector else None)
         if use_semantic_captions:
             results = [doc[self.sourcepage_field] + ":" + nonewlines(" -.- ".join([c.text for c in doc['@search.captions']])) for doc in r]
         else:
@@ -103,14 +107,14 @@ class ReadRetrieveReadApproach(AskApproach):
                 ),
             CafeSearchTool()
         ]
-        
+
        #llm = ChatOpenAI(model_name="gpt-4-0613", temperature=0)
-        llm = AzureChatOpenAI(deployment_name=self.openai_deployment,
+        llm = AzureChatOpenAI(azure_deployment=self.openai_deployment,
+                              api_version=self.openai_api_version,
+                              azure_endpoint=self.openai_endpoint,
+                              azure_ad_token_provider=self.openai_ad_token,
                               temperature=overrides.get("temperature") or 0.3,
-                              openai_api_base=openai.api_base,
-                              openai_api_version=openai.api_version,
-                              openai_api_type=openai.api_type,
-                              openai_api_key=openai.api_key)
+                              )
         SUFFIX = """
         Answer should be in Japanese.
         """
