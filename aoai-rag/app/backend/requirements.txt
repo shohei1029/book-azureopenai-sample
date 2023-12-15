@@ -324,7 +324,7 @@ python-dotenv==1.0.0
     # via uvicorn
 pytz==2023.3.post1
     # via pandas
-pywin32==306
+#pywin32==306
     # via portalocker
 pyyaml==6.0.1
     # via
