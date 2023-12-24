@@ -198,29 +198,6 @@ A:関ヶ原の戦いは、1600年10月21日に美濃国不破郡関ヶ原（岐�
         )
 
         return (extra_info, chat_coroutine)
-        # chat_content = chat_completion.choices[0].message.content
-        # logging.info(chat_content)
-        # msg_to_display = '\n\n'.join([str(message) for message in messages])
-
-        # # STEP 4: Store the chat history and answer in Cosmos DB
-        # new_item = {
-        #     "id": str(uuid.uuid4()),
-        #     "chat_session_id": self.chat_session_id,
-        #     "user_id": "A00000001",
-        #     "timestamp": datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S.%fZ'),
-        #     "conversation": [
-        #         {"role": "user", "content": history[-1]["user"]},
-        #         {"role": "assistant", "content": chat_content}
-        #     ],
-        #     "feedback": 1
-        # }
-        # try:
-        #     self.cosmos_container.create_item(new_item)
-        # except Exception as e:
-        #     logging.exception(e)
-        #     pass
-
-        # return {"data_points": results, "answer": chat_content, "thoughts": f"Searched for:<br>{query_text}<br><br>Conversations:<br>" + msg_to_display.replace('\n', '<br>')}
 
     async def run_without_streaming(self, history: list[dict[str, str]], overrides: dict[str, Any]) -> dict[str, Any]:
         extra_info, chat_coroutine = await self.run_until_final_call(history, overrides, should_stream=False)
