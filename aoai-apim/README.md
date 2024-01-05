@@ -2,7 +2,7 @@
 
 Azure OpenAIの共通基盤を自動構築するサンプルコードです。
 
-![アーキテクチャ](.\assets\architecture.png)
+<img width="800" src=".\assets\architecture.png">
 
 組織全体でガバナンスを効かせたうえでAzure OpenAIの利活用を促進するためには、次の要件を満たす共通基盤を用意し、利用者へ公開する取り組みが必要になります。
 
