@@ -4,9 +4,10 @@
 
 ## ディレクトリ構成
 
-- `aoai-rag`: Azure OpenAI Service と Azure AI Search を利用して社内文章検索 (RAG)を実現するサンプルコード。第 5 章で主に利用し、第 6 章で ChatGPT プラグインを実装する際にも利用します。
-- `aoai-flask-see`: Azure OpenAI Service によるストリーミング処理を Flask と SSE (Server-Sent Events)を用いて実装するサンプルコード。第 8 章で利用。
-- `aoai-apim`: Azure API Management を活用して Azure OpenAI Service を社内の共通基盤として利用するサンプルコード。第 9 章で利用。
+- [aoai-rag](./aoai-rag/): Azure OpenAI Service と Azure AI Search を利用して社内文章検索 (RAG)を実現するサンプルコード。第 5 章で主に利用し、第 6 章で ChatGPT プラグインを実装する際にも利用します。また、各要素の理解を深めるためにステップbyステップのノートブックも提供しています ([aoai-rag/notebooks](aoai-rag/notebooks))
+- [aoai-flask-see](./aoai-flask-sse/): Azure OpenAI Service によるストリーミング処理を Flask と SSE (Server-Sent Events)を用いて実装するサンプルコード。第 8 章で利用。
+- [aoai-apim](./aoai-apim/): Azure API Management を活用して Azure OpenAI Service を社内の共通基盤として利用するサンプルコード。第 9 章で利用。
+
 
 ## 環境構築
 
