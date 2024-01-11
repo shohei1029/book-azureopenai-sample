@@ -2,7 +2,7 @@
 
 「Azure OpenAI Service で始める ChatGPT/LLM システム構築入門」のサンプルプログラムです。
 
-技術評論社: https://gihyo.jp/book/2024/978-4-297-13929-2
+技術評論社: https://gihyo.jp/book/2024/978-4-297-13929-2  
 Amazon: https://www.amazon.co.jp/dp/4297139294/
 
 ## ディレクトリ構成
