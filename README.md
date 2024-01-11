@@ -2,6 +2,9 @@
 
 「Azure OpenAI Service で始める ChatGPT/LLM システム構築入門」のサンプルプログラムです。
 
+技術評論社: https://gihyo.jp/book/2024/978-4-297-13929-2
+Amazon: https://www.amazon.co.jp/dp/4297139294/
+
 ## ディレクトリ構成
 
 - [aoai-rag](./aoai-rag/): Azure OpenAI Service と Azure AI Search を利用して社内文章検索 (RAG)を実現するサンプルコード。第 5 章で主に利用し、第 6 章で ChatGPT プラグインを実装する際にも利用します。また、各要素の理解を深めるためにステップbyステップのノートブックも提供しています ([aoai-rag/notebooks](aoai-rag/notebooks))
