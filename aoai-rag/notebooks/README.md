@@ -13,8 +13,9 @@
 
 ### 基本
 - [01_AzureOpenAI_completion.ipynb](./basic/01_AzureOpenAI_completion.ipynb): Azure OpenAI の Completion API を使用した様々なタスクを紹介します。
-- [02_AzureOpenAI_functioncalling.ipynb](./basic/02_AzureOpenAI_functioncalling.ipynb): Azure OpenAI の Function Calling（関数呼び出し） の基本的な動作を試すことができるサンプルです。
-- [03_SemanticKernel.ipynb](./basic/03_SemanticKernel.ipynb): SemanticKernel の基本的な動作を試すことができるサンプルです。
+- [02_AzureOpenAI_chatcompletion.ipynb](./basic/02_AzureOpenAI_chatcompletion.ipynb): Azure OpenAI の Chat Completion API の基本的な動作を試すことができるサンプルです。
+- [03_AzureOpenAI_functioncalling.ipynb](./basic/03_AzureOpenAI_functioncalling.ipynb): Azure OpenAI の Function Calling（関数呼び出し） の基本的な動作を試すことができるサンプルです。
+- [04_SemanticKernel.ipynb](./basic/04_SemanticKernel.ipynb): SemanticKernel の基本的な動作を試すことができるサンプルです。
 
 ## 環境構築
 
