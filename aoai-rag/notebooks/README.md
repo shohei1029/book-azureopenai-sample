@@ -17,6 +17,7 @@
 - [03_AzureOpenAI_functioncalling.ipynb](./basic/03_AzureOpenAI_functioncalling.ipynb): Azure OpenAI の Function Calling（関数呼び出し） の基本的な動作を試すことができるサンプルです。
 - [04_AzureOpenAI_embeddings.ipynb](./basic/04_AzureOpenAI_embeddings.ipynb): Azure OpenAI の Embeddings API の基本的な動作を試すことができるサンプルです。
 - [05_SemanticKernel.ipynb](./basic/05_SemanticKernel.ipynb): SemanticKernel の基本的な動作を試すことができるサンプルです。
+- [06_AzureAIDocumentIntelligence.ipynb](./basic/06_AzureAIDocumentIntelligence.ipynb): Azure AI Document Intelligence を使用して PDF から情報を抽出するサンプルです。
 
 ## 環境構築
 
