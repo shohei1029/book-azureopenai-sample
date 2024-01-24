@@ -1,4 +1,4 @@
-# ChatGPT + Enterprise data with Azure OpenAI and Cognitive Search
+# ChatGPT + Enterprise data with Azure OpenAI and Azure AI Search
 
 ## Table of Contents
 
@@ -22,10 +22,7 @@
   - [FAQ](#faq)
   - [トラブルシューティング](#トラブルシューティング)
 
-[![Open in GitHub Codespaces](https://img.shields.io/static/v1?style=for-the-badge&label=GitHub+Codespaces&message=Open&color=brightgreen&logo=github)](https://github.com/codespaces/new?hide_repo_select=true&ref=main&repo=599293758&machine=standardLinux32gb&devcontainer_path=.devcontainer%2Fdevcontainer.json&location=WestUs2)
-[![Open in Remote - Containers](https://img.shields.io/static/v1?style=for-the-badge&label=Remote%20-%20Containers&message=Open&color=blue&logo=visualstudiocode)](https://vscode.dev/redirect?url=vscode://ms-vscode-remote.remote-containers/cloneInVolume?url=https://github.com/azure-samples/azure-search-openai-demo)
-
-このサンプルでは、Retrieval Augmented Generation パターンを使用して、独自のデータに対してChatGPT のような体験を作成するためのいくつかのアプローチを示しています。ChatGPT モデル（gpt-35-turbo）にアクセスするために Azure OpenAI Service を使用し、データのインデックス作成と検索に Azure Cognitive Search を使用しています。
+このサンプルでは、Retrieval Augmented Generation(RAG) パターンを使用して、独自のデータに対してChatGPT のような体験を作成するためのいくつかのアプローチを示しています。ChatGPT モデル（gpt-35-turbo）にアクセスするために Azure OpenAI Service を使用し、データのインデックス作成と検索に Azure AI Search を使用しています。
 
 レポジトリにはサンプルデータが含まれているので、すぐに End-to-End で試すことができます。このサンプルアプリケーションでは、日本の鎌倉時代の武将に関する Wikipedia データが含まれており、鎌倉幕府や武将について質問できるような体験ができます。
 
@@ -36,7 +33,7 @@
 
 * チャットと Q&A インターフェース
 * 引用、ソースコンテンツの追跡など、ユーザが回答の信頼性を評価するための様々な選択肢を検討する。
-* データ準備、プロンプト作成、モデル（ChatGPT）と Retriever(Azure Cognitive Search) 間の連携のための可能なアプローチを示すことができる。
+* データ準備、プロンプト作成、モデル（ChatGPT）と Retriever(Azure AI Search) 間の連携のための可能なアプローチを示すことができる。
 * UX で直接設定することで、動作の調整やオプションの実験が可能です。
 * オプション: Application Insights によるパフォーマンストレースとモニタリング
 
@@ -56,11 +53,11 @@
 - Azure App Service: Basic Tier、1CPU コア、1.75GB RAM。1 時間あたりの[価格](https://azure.microsoft.com/pricing/details/app-service/linux/)
 - Azure OpenAI: Standard Tier、ChatGPT、Ada モデル。使用された 1K トークンあたりの価格、および 1 問あたり少なくとも 1K トークンが使用されます。[価格](https://azure.microsoft.com/pricing/details/cognitive-services/openai-service/)
 - Form Recognizer: S0(Standard) Tier は、あらかじめ構築されたレイアウトを使用します。価格はドキュメント ページあたりの課金です。[価格](https://azure.microsoft.com/pricing/details/form-recognizer/)
-- Azure Cognitive Search: Standard Tier, 1 レプリカ、無料レベルのセマンティック検索。1 時間あたりの[価格](https://azure.microsoft.com/pricing/details/search/)
+- Azure AI Search: Basic Tier, 1 レプリカ、無料レベルのセマンティック検索。1 時間あたりの[価格](https://azure.microsoft.com/pricing/details/search/)
 - Azure Blob Storage: Standard Tier LRS（ローカル冗長）。ストレージと読み取り操作ごとの価格。[価格](https://azure.microsoft.com/pricing/details/storage/blobs/)
 - Azure Monitor: 従量課金制。費用は、取り込んだデータに基づいて計算されます。[価格](https://azure.microsoft.com/pricing/details/monitor/)
 
-コストを削減するために、`infra` フォルダの下のパラメータファイルを変更することで、Azure App Service、Azure Cognitive Search、Form Recognizer の無料 SKU に切り替えることができます。例えば、無料の Cognitive Search リソースは 1 サブスクリプションにつき 1 つまでで、無料の Form Recognizer リソースは各ドキュメントの最初の 2 ページのみを分析します。また、`data` フォルダ内のドキュメント数を減らすか、`prepdocs.py` スクリプトを実行する `azure.yaml` の postprovision フックを削除することで、Form Recognizer に関連するコストを削減することができます。
+コストを削減するために、`infra` フォルダの下のパラメータファイルを変更することで、Azure App Service、Azure AI Search、Form Recognizer の無料 SKU に切り替えることができます。例えば、無料の AI Search リソースは 1 サブスクリプションにつき 1 つまでで、無料の Form Recognizer リソースは各ドキュメントの最初の 2 ページのみを分析します。また、`data` フォルダ内のドキュメント数を減らすか、`prepdocs.py` スクリプトを実行する `azure.yaml` の postprovision フックを削除することで、Form Recognizer に関連するコストを削減することができます。
 
 ⚠️ 不要なコストを避けるために、アプリが使われなくなったら、忘れずにアプリを削除してください、ポータルでリソースグループを削除するか、`azd down` を実行してください。
 
@@ -69,10 +66,10 @@
 #### ローカルで実行する場合
 
 * [Azure Developer CLI](https://learn.microsoft.com/azure/developer/azure-developer-cli/install-azd)
-* [Python 3.9+](https://www.python.org/downloads/)
+* [Python 3.10+](https://www.python.org/downloads/)
   * **重要**: セットアップスクリプトを動作させるには、Windows のパスに Python と pip パッケージマネージャが含まれている必要があります。Python を Microsoft Store 経由でインストールすると、うまく実行できないことがあります。Python 公式サイトからインストーラをダウンロードして、手動でインストールしてください。
   * **重要**: コンソールから `python --version` を実行できることを確認します。Ubuntu では、`python` を `python3` にリンクするために、`sudo apt install python-is-python3` を実行する必要があるかもしれません。
-* [Node.js 14+](https://nodejs.org/en/download/)
+* [Node.js 18+](https://nodejs.org/en/download/)
 * [Git](https://git-scm.com/downloads)
 * [Powershell 7+ (pwsh)](https://github.com/powershell/powershell) - Windows ユーザーのみ。
   * **重要**: PowerShell コマンドから `pwsh.exe` を実行できることを確認します。失敗した場合は、PowerShell をアップグレードする必要があります。
@@ -92,6 +89,7 @@ GitHub Codespaces または VS Code Remote Containers を使えば、このレ�
 
 1. `azd up` を実行する - Azure リソースをプロビジョニングし、`./data` フォルダにあるファイルに基づいて検索インデックスを構築するなど、これらのリソースにこのサンプルをデプロイします。
     * このロケーションリストは [OpenAI モデル利用可能リージョン一覧](https://learn.microsoft.com/azure/cognitive-services/openai/concepts/models#model-summary-table-and-region-availability)に基づいており、可用性が変わると古くなる可能性があります。
+    * MacOS の場合は、`azd up` の前に `./scripts/prepdocs.sh` に実行権限を付与してください。例: `chmod 755 ./scripts/prepdocs.sh`
 1. アプリケーションが正常にデプロイされると、コンソールに URL が表示されます。 その URL をクリックして、ブラウザでアプリケーションを操作してください。
 
 以下のような表示になります。
@@ -176,14 +174,14 @@ Application Insights と各リクエストのトレース、エラーのログ�
 
 ## Resources
 
-* [Revolutionize your Enterprise Data with ChatGPT: Next-gen Apps w/ Azure OpenAI and Cognitive Search](https://aka.ms/entgptsearchblog)
-* [Azure Cognitive Search](https://learn.microsoft.com/azure/search/search-what-is-azure-search)
+* [Revolutionize your Enterprise Data with ChatGPT: Next-gen Apps w/ Azure OpenAI and AI Search](https://aka.ms/entgptsearchblog)
+* [Azure AI Search](https://learn.microsoft.com/azure/search/search-what-is-azure-search)
 * [Azure OpenAI Service](https://learn.microsoft.com/azure/cognitive-services/openai/overview)
 
 ### FAQ
 
 <details>
-<summary>Azure Cognitive Search は大きな文書の検索をサポートしているのに、なぜ PDF をチャンクに分割する必要があるのでしょうか？</summary>
+<summary>Azure AI Search は大きな文書の検索をサポートしているのに、なぜ PDF をチャンクに分割する必要があるのでしょうか？</summary>
 
 チャンキングによって、トークンの制限のために OpenAI に送信する情報量を制限することができます。コンテンツを分割することで、OpenAI に注入できる潜在的なテキストのチャンクを簡単に見つけることができます。私たちが使っているチャンキングの方法は、あるチャンクが終わると次のチャンクが始まるように、テキストのスライディングウィンドウを活用します。これにより、テキストのコンテキストが失われる可能性を減らすことができます。
 
@@ -205,7 +203,7 @@ https://github.com/Microsoft/sample-app-aoai-chatGPT/
 
 主な相違点
 
-* このリポジトリには、（Azure OpenAI と Azure Cognitive Search への）複数の API 呼び出しの結果をさまざまな方法で連鎖させる複数の RAG（検索拡張生成）アプローチが含まれています。もう一つのリポジトリは、ChatCompletions API の組み込みデータソースオプションのみを使用し、指定された Azure Cognitive Search インデックスで RAG アプローチを使用します。これは、ほとんどの用途で動作するはずですが、より柔軟性が必要な場合は、このサンプルの方が良いかもしれません。
+* このリポジトリには、（Azure OpenAI と Azure AI Search への）複数の API 呼び出しの結果をさまざまな方法で連鎖させる複数の RAG（検索拡張生成）アプローチが含まれています。もう一つのリポジトリは、ChatCompletions API の組み込みデータソースオプションのみを使用し、指定された Azure AI Search インデックスで RAG アプローチを使用します。これは、ほとんどの用途で動作するはずですが、より柔軟性が必要な場合は、このサンプルの方が良いかもしれません。
 * このリポジトリは、他のリポジトリのように Azure OpenAI Studio と結びついていないので、他の点でも少し実験的です。
 
 </details>
@@ -233,3 +231,6 @@ https://github.com/Microsoft/sample-app-aoai-chatGPT/
 
 1. `azd up` を実行してウェブサイトにアクセスすると、ブラウザに '404 Not Found' と表示されます。まだ起動中かもしれないので、10 分待ってからもう一度試してください。それから `azd deploy` を実行して、もう一度待ってみてください。それでもデプロイしたアプリでエラーが発生する場合は、[Tips for Debugging App Service app deployments](http://blog.pamelafox.org/2023/06/tips-for-debugging-flask-deployments-to.html) を参照してください。
 を参照し、エラーログを見ても問題が解決しない場合は、issue を提出してください。
+
+## 感謝
+本サンプルコードは [Azure-Samples/azure-search-openai-demo](https://github.com/Azure-Samples/azure-search-openai-demo) をベースにしています。
