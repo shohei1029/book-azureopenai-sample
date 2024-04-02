@@ -195,7 +195,7 @@ async def setup_clients():
     #     pass
 
     # Used by the OpenAI SDK
-    AZURE_OPENAI_API_VERSION = "2023-07-01-preview"
+    AZURE_OPENAI_API_VERSION = "2024-02-01"
     AZURE_OPENAI_API_ENDPOINT = f"https://{AZURE_OPENAI_SERVICE}.openai.azure.com"
     token_provider = get_bearer_token_provider(azure_credential, "https://cognitiveservices.azure.com/.default")
 
