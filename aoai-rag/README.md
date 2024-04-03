@@ -22,6 +22,10 @@
   - [FAQ](#faq)
   - [トラブルシューティング](#トラブルシューティング)
 
+
+> [!IMPORTANT]
+> 2024 年 4 月 2 日以降、Azure OpenAI Service の古い API バージョンが使用できなくなります。最新の GA API バージョン `2023-05-15` か、`2024-03-01-preview` を使用してください。（[Docs](https://learn.microsoft.com//azure/ai-services/openai/api-version-deprecation)）
+
 このサンプルでは、Retrieval Augmented Generation(RAG) パターンを使用して、独自のデータに対してChatGPT のような体験を作成するためのいくつかのアプローチを示しています。ChatGPT モデル（gpt-35-turbo）にアクセスするために Azure OpenAI Service を使用し、データのインデックス作成と検索に Azure AI Search を使用しています。
 
 レポジトリにはサンプルデータが含まれているので、すぐに End-to-End で試すことができます。このサンプルアプリケーションでは、日本の鎌倉時代の武将に関する Wikipedia データが含まれており、鎌倉幕府や武将について質問できるような体験ができます。
