@@ -4,6 +4,6 @@ azure-search-documents==11.4.0
 azure-ai-formrecognizer==3.3.3
 azure-storage-blob==12.20.0
 fastapi==0.99.0
-openai[datalib]==1.30.5
-tiktoken==0.7.0
+openai[datalib]
+tiktoken
 tenacity==8.3.0
