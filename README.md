@@ -1,4 +1,4 @@
-# book-azureopenai-sample
+# 「Azure OpenAI Service で始める ChatGPT/LLM システム構築入門」サンプル
 
 「Azure OpenAI Service で始める ChatGPT/LLM システム構築入門」のサンプルプログラムです。
 
