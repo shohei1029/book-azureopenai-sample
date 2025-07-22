@@ -48,11 +48,11 @@ param formRecognizerSkuName string = 'S0'
 
 param chatGptDeploymentName string // Set in main.parameters.json
 param chatGptDeploymentCapacity int = 30
-param chatGptModelName string = 'gpt-35-turbo-16k'
-param chatGptModelVersion string = '0613'
+param chatGptModelName string = 'gpt-4.1-mini'
+param chatGptModelVersion string = '2025-04-14'
 param embeddingDeploymentName string = 'embedding'
 param embeddingDeploymentCapacity int = 30
-param embeddingModelName string = 'text-embedding-ada-002'
+param embeddingModelName string = 'text-embedding-3-small'
 
 @description('Id of the user or app to assign application roles')
 param principalId string = ''
@@ -161,7 +161,7 @@ module openAi 'core/ai/cognitiveservices.bicep' = {
           version: chatGptModelVersion
         }
         sku: {
-          name: 'Standard'
+          name: 'GlobalStandard'
           capacity: chatGptDeploymentCapacity
         }
       }
@@ -170,9 +170,12 @@ module openAi 'core/ai/cognitiveservices.bicep' = {
         model: {
           format: 'OpenAI'
           name: embeddingModelName
-          version: '2'
+          version: '1'
         }
-        capacity: embeddingDeploymentCapacity
+        sku: {
+          name: 'GlobalStandard'
+          capacity: embeddingDeploymentCapacity
+        }
       }
     ]
   }
