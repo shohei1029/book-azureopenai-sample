@@ -1,10 +1,17 @@
 from collections import namedtuple
 from unittest import mock
 
-import openai
 import pytest
 import pytest_asyncio
 from azure.search.documents.aio import SearchClient
+from openai.resources.chat.completions import AsyncCompletions
+from openai.resources.embeddings import AsyncEmbeddings
+from openai.types import CreateEmbeddingResponse, Embedding
+from openai.types.chat import ChatCompletion, ChatCompletionChunk, ChatCompletionMessage
+from openai.types.chat.chat_completion import Choice
+from openai.types.chat.chat_completion_chunk import Choice as ChunkChoice
+from openai.types.chat.chat_completion_chunk import ChoiceDelta
+from openai.types.create_embedding_response import Usage
 
 import app
 
@@ -12,16 +19,24 @@ MockToken = namedtuple("MockToken", ["token", "expires_on"])
 
 
 class MockAzureCredential:
-    async def get_token(self, uri):
+    async def get_token(self, *scopes, **kwargs):
         return MockToken("mock_token", 9999999999)
+
+    async def close(self):
+        pass
 
 
 @pytest.fixture
 def mock_openai_embedding(monkeypatch):
-    async def mock_acreate(*args, **kwargs):
-        return {"data": [{"embedding": [0.1, 0.2, 0.3]}]}
+    async def mock_create(*args, **kwargs):
+        return CreateEmbeddingResponse(
+            object="list",
+            data=[Embedding(object="embedding", index=0, embedding=[0.1, 0.2, 0.3])],
+            model="text-embedding-3-small",
+            usage=Usage(prompt_tokens=8, total_tokens=8),
+        )
 
-    monkeypatch.setattr(openai.Embedding, "acreate", mock_acreate)
+    monkeypatch.setattr(AsyncEmbeddings, "create", mock_create)
 
 
 @pytest.fixture
@@ -37,22 +52,34 @@ def mock_openai_chatcompletion(monkeypatch):
         async def __anext__(self):
             if self.num == 1:
                 self.num = 0
-                return openai.util.convert_to_openai_object({"choices": [{"delta": {"content": self.answer}}]})
+                return ChatCompletionChunk(
+                    id="test-123",
+                    object="chat.completion.chunk",
+                    created=1700000000,
+                    model="gpt-35-turbo",
+                    choices=[ChunkChoice(index=0, delta=ChoiceDelta(content=self.answer), finish_reason=None)],
+                )
             else:
                 raise StopAsyncIteration
 
-    async def mock_acreate(*args, **kwargs):
+    async def mock_create(*args, **kwargs):
         messages = kwargs["messages"]
         if messages[-1]["content"] == "Generate search query for: What is the capital of France?":
             answer = "capital of France"
         else:
             answer = "The capital of France is Paris."
-        if "stream" in kwargs and kwargs["stream"] is True:
+        if kwargs.get("stream") is True:
             return AsyncChatCompletionIterator(answer)
         else:
-            return openai.util.convert_to_openai_object({"choices": [{"message": {"content": answer}}]})
+            return ChatCompletion(
+                id="test-123",
+                object="chat.completion",
+                created=1700000000,
+                model="gpt-35-turbo",
+                choices=[Choice(index=0, message=ChatCompletionMessage(role="assistant", content=answer), finish_reason="stop")],
+            )
 
-    monkeypatch.setattr(openai.ChatCompletion, "acreate", mock_acreate)
+    monkeypatch.setattr(AsyncCompletions, "create", mock_create)
 
 
 @pytest.fixture

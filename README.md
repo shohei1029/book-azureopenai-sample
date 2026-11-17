@@ -19,7 +19,7 @@ Amazon: https://www.amazon.co.jp/dp/4297139294/
 1. Python 3.10 以上
 2. Git
 3. Azure Developer CLI
-4. Node.js 18 以上
+4. Node.js 20 以上
 5. PowerShell 7 以上 (pwsh) ※Windows ユーザーのみ
 
 ### 1. Python 3.10.11 のインストール
@@ -64,9 +64,9 @@ Homebrew を利用してインストールする方法が推奨されていま�
 brew tap azure/azd && brew install azd
 ```
 
-### 4. Node.js 18 LTS 版のインストール
+### 4. Node.js LTS 版（20 以上）のインストール
 
-[Node.js 18 LTS](https://nodejs.org/ja/download) から LTS 版を選択し、ご自分の OS をクリックしてインストーラーをダウンロードして実行します。
+[Node.js LTS](https://nodejs.org/ja/download) から LTS 版を選択し、ご自分の OS をクリックしてインストーラーをダウンロードして実行します。
 
 ### 5. PowerShell 7 のインストール (Windows のみ)
 

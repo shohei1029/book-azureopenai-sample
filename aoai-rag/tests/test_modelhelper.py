@@ -58,4 +58,10 @@ def test_get_oai_chatmodel_tiktok_error():
     with pytest.raises(ValueError, match="Expected Azure OpenAI ChatGPT model name"):
         get_oai_chatmodel_tiktok(None)
     with pytest.raises(ValueError, match="Expected Azure OpenAI ChatGPT model name"):
-        get_oai_chatmodel_tiktok("gpt-3")
+        get_oai_chatmodel_tiktok("davinci")
+
+
+def test_get_oai_chatmodel_tiktok_fallback():
+    # Unknown GPT-4 / GPT-3 variants fall back to a model that tiktoken recognizes
+    assert get_oai_chatmodel_tiktok("gpt-4o") == "gpt-4o-mini"
+    assert get_oai_chatmodel_tiktok("gpt-3") == "gpt-3.5-turbo"
