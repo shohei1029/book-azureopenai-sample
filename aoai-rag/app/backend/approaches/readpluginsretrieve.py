@@ -30,7 +30,9 @@ class ReadPluginsRetrieve(AskApproach):
                         temperature=overrides.get("temperature") or 0.0,
                         )
 
-            tools = load_tools(["requests_all"])
+            # LangChain 0.3 以降、HTTP リクエストを送る requests_* ツールの利用には明示的な許可が必要です。
+            # このサンプルではプラグインの API を呼び出すために使います。
+            tools = load_tools(["requests_all"], allow_dangerous_tools=True)
             plugin_urls = ["http://localhost:5005/.well-known/ai-plugin.json", "http://localhost:5006/.well-known/ai-plugin.json"]
 
             tools += [AIPluginTool.from_plugin_url(url) for url in plugin_urls]
