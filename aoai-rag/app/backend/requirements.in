@@ -5,8 +5,12 @@ azure-monitor-opentelemetry
 azure-search-documents
 azure-storage-blob
 cffi
-# LangChain is intentionally kept at 0.0.x to match the book's sample code.
-langchain==0.0.350
+# LangChain is kept on the 0.3.x line so the book's sample code keeps working
+# (1.x removes initialize_agent, AIPluginTool, etc.).
+langchain>=0.3.30,<0.4
+langchain-community>=0.3.27,<0.4
+langchain-core>=0.3.85,<0.4
+langsmith>=0.8.18
 msal
 msal-extensions
 openai[datalib]

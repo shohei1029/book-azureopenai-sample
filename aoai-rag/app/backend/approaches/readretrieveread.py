@@ -143,8 +143,8 @@ class ReadRetrieveReadApproach(AskApproach):
 # https://python.langchain.com/docs/modules/agents/tools/custom_tools
 class CafeSearchTool(BaseTool):
     data: dict[str, str] = {}
-    name = "CafeSearchTool"
-    description = "武将のゆかりのカフェを検索するのに便利です。カフェの検索クエリには、武将の**名前のみ**を入力してください。"
+    name: str = "CafeSearchTool"
+    description: str = "武将のゆかりのカフェを検索するのに便利です。カフェの検索クエリには、武将の**名前のみ**を入力してください。"
 
     # Use the tool synchronously.
     def _run(self, query: str) -> str:

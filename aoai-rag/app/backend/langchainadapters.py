@@ -34,7 +34,7 @@ class HtmlCallbackHandler (BaseCallbackHandler):
     ) -> None:
         """Print out that we are entering a chain."""
         class_name = "unknown"
-        if "name" in serialized:
+        if serialized and "name" in serialized:
             class_name = serialized["name"]
         self.html += f"Entering chain: {ch(class_name)}<br>"
 
